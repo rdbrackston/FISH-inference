@@ -10,7 +10,8 @@ export solvemaster_matrix, solvemaster, solvecompound, mcmc_metropolis, log_like
 
 
 """
-Function to load in the experimental data, filtering out missings/NaNs and applying upper cut-off
+Function to load in the experimental data, filtering out missings/NaNs and
+applying upper cut-off in terms of standard deviations from the mean.
 """
 function load_data(File::String, Folder::String, cutOff::Number=5.0)
 
@@ -33,7 +34,8 @@ end
 
 
 """
-Function to evaluate the log-likelihood of the data, given a particular set of parameters.
+Function to evaluate the log-likelihood of the data, given the standard model
+with a particular set of parameters.
 """
 function log_likelihood(parameters, data)
     
@@ -54,7 +56,8 @@ function log_likelihood(parameters, data)
 end
 
 """
-Function to evaluate the log-likelihood of the data, given a particular set of parameters.
+Function to evaluate the log-likelihood of the data, given the compound model
+with a particular set of parameters.
 """
 function log_likelihood_compound(baseParams, distParams, distFunc, idx, data; lTheta::Integer=100, cdfMax::AbstractFloat=0.98)
     
@@ -77,11 +80,13 @@ end
 """
 Function to perform the MCMC metropolis algorithm.
 """
-function mcmc_metropolis(x0::AbstractArray, logPfunc::Function, Lchain::Integer; propVar::AbstractFloat=0.1,
-                         burn::Integer=500, step::Integer=500, printFreq::Integer=10000, prior=:none)
+function mcmc_metropolis(x0::AbstractArray, logPfunc::Function, Lchain::Integer;
+                         propVar::AbstractFloat=0.1, burn::Integer=500,
+                         step::Integer=500, printFreq::Integer=10000,
+                         prior=:none, verbose=true)
     
 	if length(size(x0)) > 1 # restart from old chain
-        println("Restarting from old chain")
+        if verbose; println("Restarting from old chain"); end
 		xOld = x0[end,:]
 		n = length(xOld)
 	else
@@ -123,10 +128,15 @@ function mcmc_metropolis(x0::AbstractArray, logPfunc::Function, Lchain::Integer;
         chain[ii,:] = xOld
         
         if ii % printFreq == 0
-            Printf.@printf("Completed iteration %i out of %i. \n", ii,Lchain)
+            if verbose
+                Printf.@printf("Completed iteration %i out of %i. \n", ii,Lchain)
+            end
         end
     end
-    Printf.@printf("Acceptance ratio of %.2f (%i out of %i).\n", acc/Lchain,acc,Lchain)
+    
+    if verbose
+        Printf.@printf("Acceptance ratio of %.2f (%i out of %i).\n", acc/Lchain,acc,Lchain)
+    end
 
 	if length(size(x0)) > 1
 		chainRed = [x0; chain[step:step:end,:]] # Append new chain to old
@@ -228,8 +238,8 @@ function chain_reduce(chains; burn::Integer=500, step::Integer=500)
 end
 
 """
-Function to compute the hypergeometric function using a Maclaurin series. Adapted from 
-https://github.com/JuliaApproximation/SingularIntegralEquations.jl/src/HypergeometricFunctions/specialfunctions.jl
+Function to compute the hypergeometric function using a Maclaurin series.
+Adapted from https://github.com/JuliaApproximation/SingularIntegralEquations.jl/src/HypergeometricFunctions/specialfunctions.jl
 """
 function hypergeom1F1(a::Float64,b::Float64,z::Float64)
     
@@ -247,10 +257,13 @@ end
 
 
 """
-Function to obtain the steady state distribution when one or more parameters are drawn from a distribution.
+Function to obtain the steady state distribution when one or more parameters are
+drawn from a distribution.
 """
-function solvecompound(parameters::AbstractArray, hyperParameters::AbstractArray, distFunc::Function,
-		 parIndex=[1]; lTheta::Integer=100, cdfMax::AbstractFloat=0.98, N::Union{Symbol,Integer}=:auto)
+function solvecompound(parameters::AbstractArray, hyperParameters::AbstractArray,
+                       distFunc::Function, parIndex=[1]; lTheta::Integer=100,
+                       cdfMax::AbstractFloat=0.98, N::Union{Symbol,Integer}=:auto,
+                       verbose=false)
     
 
     parDistribution = distFunc(log(parameters[parIndex[1]])-hyperParameters[1]^2/2,hyperParameters[1])
@@ -270,8 +283,7 @@ function solvecompound(parameters::AbstractArray, hyperParameters::AbstractArray
     		PVec[ii] = solvecompound(parMod, hyperParameters[2:end], distFunc,
     			parIndex[2:end], lTheta=lTheta, cdfMax=cdfMax, N=N)
     	else
-        	PVec[ii] = solvemaster2(parMod, N)
-            # PVec[ii] = solvemaster(parMod, N)
+        	PVec[ii] = solvemaster(parMod, N, verbose)
         end
         L = max(L,length(PVec[ii])-1)
     end
@@ -300,54 +312,13 @@ function solvecompound(parameters::AbstractArray, hyperParameters::AbstractArray
     
 end
 
-"""
-Function to solve the master equation analytically
-"""
-function solvemaster(parameters, N=:auto::Union{Symbol,Int64})
 
-    λ = parameters[2]
-    ν = parameters[3]
-    K = parameters[1]
-    δ = 1.0
-    E = λ*K/(λ+ν)/δ    # Mean
-    V = λ*K/(λ+ν)/δ + λ*ν*K^2/((λ+ν)^2)/(λ+ν+δ)/δ    # Variance
-    
-    if N==:auto
-        M = Int(ceil(E+5*sqrt(V)))    # Rule of thumb for maximum number of mRNA with non-negligible probability
-    else
-    	M = min(N,Int(ceil(E+5*sqrt(V))))
-    end
-    P = zeros(M)
-    
-    a = λ/δ
-    b = (λ+ν)/δ
-    c = K/δ
-    
-    try # Hypergeom1F1 fails for some argument values
-    	for n=0:M-1
-    		P[n+1] = c^n * GSL.hypergeom(a+n,b+n,-c)/factorial(big(n))
-	    	if Base.isinf(P[n+1])    # Use Stirling's approximation for n!
-	    		P[n+1] = GSL.hypergeom(a+n,b+n,-c) * (c*ℯ/n)^n / sqrt(2*n*pi)
-	    	end
-	        for m=0:n-1
-	            P[n+1] *= (a+m)/(b+m)
-	        end
-    	end
-    catch
-    	P = solvemaster_matrix(parameters,N,true)
-    end
-
-    # P = P./sum(P)
-    return P
-    
-end
-
-
-# import Optim, JuMP, Clp
 """
-Function to solve the master equation at steady state, returning the probability mass function.
+Function to solve the master equation at steady state, returning the probability
+mass function. Evaluation uses the analytical expression for p(n) where possible
+before solving the matrix equation for the remaining higher values of n.
 """
-function solvemaster2(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
+function solvemaster(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
 
 	if verbose
     	Printf.@printf("Solving master equation via the combined method.\n")
@@ -360,21 +331,22 @@ function solvemaster2(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
     E = λ*K/(λ+ν)/δ    # Mean
     V = λ*K/(λ+ν)/δ + λ*ν*K^2/((λ+ν)^2)/(λ+ν+δ)/δ    # Variance
     
-    Nguess = Int(round(E+5*sqrt(V)))    # Rule of thumb for maximum number of mRNA with non-negligible probability
+    # Rule of thumb for maximum number of mRNA with non-negligible probability
+    Nguess = Int(round(E+5*sqrt(V)))
     if N==:auto
         N = Nguess
     else
     	N = min(N,Nguess)
     end
-
-    P = zeros(N)
     
     a = λ/δ
     b = (λ+ν)/δ
     c = K/δ
 
+    # Evaluate using anaytical expression as far as possible
 	global T = N
     global failed = false
+    P = zeros(N)
     for n=0:N-1
     	try # Hypergeom1F1 fails for some argument values
     		P[n+1] = c^n * GSL.hypergeom(a+n,b+n,-c)/factorial(big(n))
@@ -391,28 +363,11 @@ function solvemaster2(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
     	end
     end
 
-    if false
+    # If required, evaluate remainder of P using the matrix expression
+    if failed
         if verbose
     	   Printf.@printf("Hypergeom1f1 failed, solving matrix equation for N > %i.\n",T)
         end
-    	# T -= 1
-        T = 10
-	    A = A_matrix(λ,ν,K,δ, N, true)
-
-	    # Solve AX=b problem for remaining values in P
-	    Ar = [A[T:N,T:N] SparseArrays.spzeros(N-T+1,N-T+1);
-	    	  SparseArrays.spzeros(N-T+1,N-T+1) A[N+T:end,N+T:end]]
-	    b = zeros(2*(N-T+1),1)
-	    b[N-T+2] = 1.0
-	    Pr = Ar\b
-
-	    # Reassemble reduced form of P
-	    Pr = abs.(Pr[1:N-T+1] + Pr[N-T+2:end])
-	    Pr = Pr .* P[T]/Pr[1]    # Rescale Pr
-	    P[T:end] = Pr
-	end
-
-    if failed
         T-=1
         A = A_matrix(λ,ν,K,δ, N, false)
         A = [A[T:N,:]; A[N+T:end,:]]
@@ -428,23 +383,6 @@ function solvemaster2(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
         Pr = Pr .* P[T]/Pr[1]    # Rescale Pr
         P[T:end] = Pr
     end
-
-    # Use optim to converge to the nullspace
-    # f(x) = sum(abs.(A*x))
-	# res = Optim.optimize(f,P)
-	# P = res.minimizer
-
-	# m = JuMP.Model(solver=Clp.ClpSolver())
-	# JuMP.@variable(m, x[1:2*N])
-	# JuMP.@variable(m, y[1:2*N])
-	# for ii=1:2N
-	# 	JuMP.@constraint(m, 0 <= x[ii])
-	# 	JuMP.@constraint(m, y[ii] >= A[ii,:]'*x)
-	#	JuMP.@constraint(m, y[ii] >= -A[ii,:]'*x)
-	# end
-	# JuMP.@objective(m, Min, sum(y))
-	# JuMP.solve(m)
-	# P = JuMP.getvalue(x)
 
     P = P./sum(P)
     
@@ -468,7 +406,8 @@ function solvemaster_matrix(parameters, N=:auto::Union{Symbol,Int64}, verbose=fa
     V = λ*K/(λ+ν)/δ + λ*ν*K^2/((λ+ν)^2)/(λ+ν+δ)/δ    # Variance
     
     if N==:auto
-        N = Int(round(E+5*sqrt(V)))    # Rule of thumb for maximum number of mRNA with non-negligible probability
+        # Rule of thumb for maximum number of mRNA with non-negligible probability
+        N = Int(round(E+5*sqrt(V)))
     end
     
     A = A_matrix(λ,ν,K,δ, N)
