@@ -5,13 +5,14 @@ module TxModels
 using Distributions, CSV, DataFrames, Plots, Optim
 import LinearAlgebra, GSL, Printf, Base.Threads, Random, Future, SparseArrays, SpecialFunctions
 
-include("PlotUtils.jl")
 include("ModelInference.jl")
+include("PlotUtils.jl")
 include("Utilities.jl")
+
 
 """
 Function to obtain the steady state distribution when one or more parameters are
-drawn from a distribution.
+drawn from a distribution. Recursively marginalises over each parameter in turn.
 """
 function solvecompound(parameters::AbstractArray, hyperParameters::AbstractArray,
                        distFunc::Symbol, parIndex=[1]; lTheta::Integer=100,
@@ -82,6 +83,7 @@ function solvecompound(parameters::AbstractArray, hyperParameters::AbstractArray
     Q = Q./sum(Q)    # Normalize
     
 end
+
 
 """
 Loss function for the parameters of the truncated normal distribution.
@@ -204,6 +206,7 @@ function solvemaster_matrix(parameters, N=:auto::Union{Symbol,Int64}, verbose=fa
     P = P./sum(P)
     
 end
+
 
 """
 Function to assemble the A matrix of the master equation.
