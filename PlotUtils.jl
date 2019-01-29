@@ -1,6 +1,7 @@
-using RecipesBase
+# Plotting utilities for use with the parameter inference
 
-using Reexport
+using RecipesBase, Reexport
+
 @reexport using Plots
 import Plots: _cycle
 import KernelDensity; const KDE = KernelDensity
@@ -19,7 +20,6 @@ function plot_chain(chain)
 	for ii=1:nVar
 		plots[ii] = plot(chain[:,ii], legend=false, title=Printf.@sprintf("Parameter %i",ii));
 
-		# (x,y) = SignalUtils.genpdf(chain[:,ii])
 		smpls = chain[:,ii]
 		kdeObj = KDE.kde(smpls)
 		x = collect(range(minimum(smpls),stop=maximum(smpls),length=100))
@@ -67,7 +67,7 @@ Chain can either be the full MCMC chain, or a vector of parameters.
 function plot_inference(chain, data, idx; guess=[],hyper=[])
 
     dataInt = Integer.(round.(data))
-	(x,y) = SignalUtils.genpdf(dataInt)
+	(x,y) = genpdf(dataInt)
 	# plt = plot(x,y, marker=(2,:cross),line=0, label="Data")
     plt = bar(x,y, label="Data", xlabel="mRNA copy no. (n)", ylabel="Probability, P(n)")
 
@@ -84,6 +84,44 @@ function plot_inference(chain, data, idx; guess=[],hyper=[])
 	end
 
 	return plt
+
+end
+
+
+"""
+Generate a normalized pdf from continuous data
+"""
+function genpdf(data::Array{Float64,1}, nbin=:auto::Union{Int,Symbol})
+
+    filter!(x -> !isnan(x), data)    # Remove nans from data
+
+    edges = binedges(DiscretizeUniformWidth(nbin), data)
+    disc = LinearDiscretizer(edges)
+    counts = get_discretization_counts(disc, data)
+
+    x = edges[1:end-1]+0.5*diff(edges)
+    y = (counts./(diff(edges)*float(size(data)[1]))) # Normalise
+    return (x,y)
+
+end
+
+
+"""
+1D integer version of genpdf, intended for use when the underlying data is discrete.
+"""
+function genpdf(data::Array{Int64,1}, nbin=:auto::Union{Int,Symbol})
+
+    println("Implementing integer version of genpdf.")
+    # Set bins to all the integers between lo and hi
+    lo, hi = extrema(data)
+    edges = collect(lo-1:hi) .+ 0.5
+
+    disc = LinearDiscretizer(edges)
+    counts = get_discretization_counts(disc, data)
+
+    x = edges[1:end-1]+0.5*diff(edges)
+    y = (counts./(diff(edges)*float(size(data)[1]))) # Normalise
+    return (x,y)
 
 end
 
