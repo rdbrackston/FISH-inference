@@ -4,22 +4,67 @@
 Function to load in the experimental data, filtering out missings/NaNs and
 applying upper cut-off in terms of standard deviations from the mean.
 """
-function load_data(File::String, Folder::String, cutOff::Number=5.0)
+function load_data(File::String, Folder::String, cutOff::Number=Inf)
 
-	rnaData = CSV.read(Folder*File*".csv", datarow=1)[1]
-	rnaData = collect(Missings.replace(rnaData, NaN))
+    if occursin(".csv",File)
+        rnaData = CSV.read(Folder*File, datarow=1)[1]
+    else
+	   rnaData = CSV.read(Folder*File*".csv", datarow=1)[1]
+    end
+
+    try
+	   rnaData = collect(Missings.replace(rnaData, NaN))
+    catch
+        rnaData = collect(Missings.replace(rnaData, 0))
+    end
 	filter!(x -> !isnan(x), rnaData)
 
 	nMax = maximum(round.(rnaData))
-	for ii=1:nMax
-		global fltData = filter(x -> x<nMax-ii, rnaData)
-		# if maximum(fltData)<cutOff*mean(fltData)
-		if maximum(fltData)<mean(fltData)+cutOff*std(fltData)
-			break
-		end
-	end
+    if !isinf(cutOff)
+    	for ii=1:nMax
+    		global fltData = filter(x -> x<nMax-ii, rnaData)
+    		# if maximum(fltData)<cutOff*mean(fltData)
+    		if maximum(fltData)<mean(fltData)+cutOff*std(fltData)
+    			break
+    		end
+    	end
+    else
+        global fltData = rnaData
+    end
 
 	return fltData
+
+end
+
+
+"""
+Function to load in two sets of experimental data, filtering out missings/NaNs 
+from both sets togetehr to maintain equal length.
+"""
+function load_data(File1::String, File2::String, Folder::String)
+
+    # Load in the two sets of data, robust to inclusion/exclusion of ".csv"
+    if occursin(".csv",File1)
+        data1 = DelimitedFiles.readdlm(Folder*File1)[:]
+    else
+        data1 = DelimitedFiles.readdlm(Folder*File1*".csv")[:]
+    end
+    if occursin(".csv",File2)
+        data2 = DelimitedFiles.readdlm(Folder*File2)[:]
+    else
+        data2 = DelimitedFiles.readdlm(Folder*File2*".csv")[:]
+    end
+
+    if !isequal(length(data1),length(data2))
+        println("Two data files of unequal length")
+        return [],[]
+    end
+
+    L = length(data1)
+    data1Filt = [data1[ii] for ii=1:L if !isnan(data1[ii]) && !isnan(data2[ii])]
+    data2Filt = [data2[ii] for ii=1:L if !isnan(data1[ii]) && !isnan(data2[ii])]
+
+    return data1Filt, data2Filt
 
 end
 
