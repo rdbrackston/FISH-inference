@@ -1,6 +1,6 @@
 # Plotting utilities for use with the parameter inference
 
-using RecipesBase, Reexport
+using RecipesBase, Reexport, Discretizers
 
 @reexport using Plots
 import Plots: _cycle

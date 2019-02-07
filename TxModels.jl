@@ -2,7 +2,7 @@
 
 module TxModels
 
-using Distributions, CSV, DataFrames, Plots, Optim
+using Distributions, CSV, DataFrames, Plots, Optim, DifferentialEquations
 import LinearAlgebra, GSL, Printf, Base.Threads, Random, Future, SparseArrays, SpecialFunctions, DelimitedFiles
 
 include("ModelInference.jl")
@@ -97,6 +97,59 @@ function trunc_norm_loss(prms, m, v)
     vAct = σ^2*(1 - 2*μ*exp(-μ^2/(2*σ^2))/(σ*sqrt(2*pi)*(1-SpecialFunctions.erf(-μ/sqrt(2)*σ)))
            - (2*exp(-μ^2/(2*σ^2))/(sqrt(2*pi)*(1-SpecialFunctions.erf(-μ/sqrt(2)*σ))))^2)
     return (m-mAct)^2 + (v-vAct)^2
+
+end
+
+
+"""
+Function to evaluate a normalised probability distribution from a simulation
+"""
+function simmaster(parameters)
+
+	# Set up full length parameter vector
+	if length(parameters)==3
+		prms = [0.0; parameters[:]]
+	else
+		prms = parameters
+	end
+
+	# Setup the problem
+	x₀ = [prms[2],1,0]
+	tspan = (0.0, 200000.0)
+	prob = DiscreteProblem(x₀,tspan,prms)
+
+	# RNA synthesis aty rate K₀
+	jumprate1(u,p,t) = u[3]*p[1]
+	affect1!(integrator) = integrator.u[1] += 1.
+	jump1 = ConstantRateJump(jumprate1,affect1!)
+
+	# RNA synthesis at rate K₁
+	jumprate2(u,p,t) = u[2]*p[2]
+	affect2!(integrator) = integrator.u[1] += 1.
+	jump2 = ConstantRateJump(jumprate2,affect2!)
+
+	# RNA degradation, rate equal to one
+	jumprate3(u,p,t) = u[1]
+	affect3!(integrator) = integrator.u[1] -= 1.
+	jump3 = ConstantRateJump(jumprate3,affect3!)
+
+	# Gene activation
+	jumprate4(u,p,t) = u[3]*p[3]
+	affect4!(integrator) = (integrator.u[2] += 1.; integrator.u[3] -= 1.)
+	jump4 = ConstantRateJump(jumprate4,affect4!)
+
+	# Gene deactivation
+	jumprate5(u,p,t) = u[2]*p[4]
+	affect5!(integrator) = (integrator.u[2] -= 1.; integrator.u[3] += 1.)
+	jump5 = ConstantRateJump(jumprate5,affect5!)
+
+	# Run simulation
+	jump_prob = JumpProblem(prob,Direct(),jump1,jump2,jump3,jump4,jump5)
+    sol = solve(jump_prob, FunctionMap(), maxiters=10^8)
+    tSamp = 100.0 .+ (prob.tspan[2]-100.0)*rand(10000)
+    simData = [sol(tSamp[ii])[1] for ii=1:length(tSamp)]
+
+    bin,P = genpdf(Integer.(round.(simData)))
 
 end
 
