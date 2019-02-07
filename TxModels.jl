@@ -111,69 +111,125 @@ function solvemaster(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
 	if verbose
     	Printf.@printf("Solving master equation via the combined method.\n")
     end
-    
-    λ = parameters[2]
-    ν = parameters[3]
-    K = parameters[1]
-    δ = 1.0
-    E = λ*K/(λ+ν)/δ    # Mean
-    V = λ*K/(λ+ν)/δ + λ*ν*K^2/((λ+ν)^2)/(λ+ν+δ)/δ    # Variance
-    
-    # Rule of thumb for maximum number of mRNA with non-negligible probability
-    Nguess = Int(round(E+5*sqrt(V)))
-    if N==:auto
-        N = Nguess
-    else
-    	N = min(N,Nguess)
-    end
-    
-    a = λ/δ
-    b = (λ+ν)/δ
-    c = K/δ
 
-    # Evaluate using anaytical expression as far as possible
-	global T = N
-    global failed = false
-    P = zeros(N)
-    for n=0:N-1
-    	try # Hypergeom1F1 fails for some argument values
-    		P[n+1] = c^n * GSL.hypergeom(a+n,b+n,-c)/factorial(big(n))
-	    	if Base.isinf(P[n+1])    # Use Stirling's approximation for n!
-	    		P[n+1] = GSL.hypergeom(a+n,b+n,-c) * (c*ℯ/n)^n / sqrt(2*n*pi)
+ 	# Call the full function if four parameters are included
+    if length(parameters)==4
+
+    	λ = parameters[3]
+		ν = parameters[4]
+		K₀ = parameters[1]
+		K₁ = parameters[2]
+	    δ = 1.0
+	    E = λ*K₁/(λ+ν)/δ    # Mean
+	    V = λ*K₁/(λ+ν)/δ + λ*ν*K₁^2/((λ+ν)^2)/(λ+ν+δ)/δ    # Variance
+	    
+	    # Rule of thumb for maximum number of mRNA with non-negligible probability
+	    Nguess = Int(round(E+5*sqrt(V)))
+	    if N==:auto
+	        N = Nguess
+	    else
+	    	N = min(N,Nguess)
+	    end
+
+	    return solvemaster_full(parameters, N)
+
+	else
+
+		λ = parameters[2]
+		ν = parameters[3]
+		K = parameters[1]
+	    δ = 1.0
+	    E = λ*K/(λ+ν)/δ    # Mean
+	    V = λ*K/(λ+ν)/δ + λ*ν*K^2/((λ+ν)^2)/(λ+ν+δ)/δ    # Variance
+	    
+	    # Rule of thumb for maximum number of mRNA with non-negligible probability
+	    Nguess = Int(round(E+5*sqrt(V)))
+	    if N==:auto
+	        N = Nguess
+	    else
+	    	N = min(N,Nguess)
+	    end
+
+	    a = λ/δ
+	    b = (λ+ν)/δ
+	    c = K/δ
+
+	    # Evaluate using anaytical expression as far as possible
+		global T = N
+	    global failed = false
+	    P = zeros(N)
+	    for n=0:N-1
+	    	try # Hypergeom1F1 fails for some argument values
+	    		P[n+1] = c^n * GSL.hypergeom(a+n,b+n,-c)/factorial(big(n))
+		    	if Base.isinf(P[n+1])    # Use Stirling's approximation for n!
+		    		P[n+1] = GSL.hypergeom(a+n,b+n,-c) * (c*ℯ/n)^n / sqrt(2*n*pi)
+		    	end
+		        for m=0:n-1
+		            P[n+1] *= (a+m)/(b+m)
+		        end
+		    catch
+		    	P[n+1] = 0.0
+		    	T = min(T,n+1)
+	            failed = true
 	    	end
-	        for m=0:n-1
-	            P[n+1] *= (a+m)/(b+m)
+	    end
+
+	    # If required, evaluate remainder of P using the matrix expression
+	    if failed
+	        if verbose
+	    	   Printf.@printf("Hypergeom1f1 failed, solving matrix equation for N > %i.\n",T)
 	        end
-	    catch
-	    	P[n+1] = 0.0
-	    	T = min(T,n+1)
-            failed = true
+	        T-=1
+	        A = A_matrix(0,K,λ,ν,δ, N, false)
+	        A = [A[T:N,:]; A[N+T:end,:]]
+	        Pfull = [P*ν/(λ+ν); P*λ/(λ+ν)]
+
+	        idx1 = [collect(1:T-1);collect(N+1:N+T-1)]
+	        idx2 = [collect(T:N);collect(N+T:2N)]
+	        Pr = -A[:,idx2]\A[:,idx1]*Pfull[idx1]
+
+	        # Reassemble reduced form of P
+	        l = Integer(length(Pr)/2)
+	        Pr = abs.(Pr[1:l] + Pr[l+1:end])
+	        Pr = Pr .* P[T]/Pr[1]    # Rescale Pr
+	        P[T:end] = Pr
+	    end
+
+	    P = P./sum(P)
+	    return P
+	end
+    
+end
+
+
+"""
+Function to evaluate the analytical distribution for the leaky gene expression model.
+Called by solvemaster for cases in which parameters has length four.
+!! CURRENTLY INCORRECT !!
+"""
+function solvemaster_full(parameters, N)
+
+	# Assign the parameters
+	λ = parameters[3]
+	ν = parameters[4]
+	K₀ = parameters[1]
+	K₁ = parameters[2]
+    δ = 1.0
+
+	P = zeros(N)
+    for n=0:N-1
+    	for r=0:n
+    		# P[n+1] += binomial(big(n),big(r))*K₁^(n-r)*(K₀-K₁)^r*GSL.hypergeom(ν+r,λ+ν+r,K₁-K₀)
+    		P[n+1] += binomial(big(n),big(r))*K₁^(n-r)*exp(-K₁)*(K₀-K₁)^r*GSL.hypergeom(ν+r,λ+ν+r,K₁-K₀)
+    		for m=0:r-1
+	            P[n+1] *= (ν+m)/(ν+λ+m)
+	        end
     	end
-    end
-
-    # If required, evaluate remainder of P using the matrix expression
-    if failed
-        if verbose
-    	   Printf.@printf("Hypergeom1f1 failed, solving matrix equation for N > %i.\n",T)
-        end
-        T-=1
-        A = A_matrix(λ,ν,K,δ, N, false)
-        A = [A[T:N,:]; A[N+T:end,:]]
-        Pfull = [P*ν/(λ+ν); P*λ/(λ+ν)]
-
-        idx1 = [collect(1:T-1);collect(N+1:N+T-1)]
-        idx2 = [collect(T:N);collect(N+T:2N)]
-        Pr = -A[:,idx2]\A[:,idx1]*Pfull[idx1]
-
-        # Reassemble reduced form of P
-        l = Integer(length(Pr)/2)
-        Pr = abs.(Pr[1:l] + Pr[l+1:end])
-        Pr = Pr .* P[T]/Pr[1]    # Rescale Pr
-        P[T:end] = Pr
+    	P[n+1] = P[n+1]/factorial(big(n))
     end
 
     P = P./sum(P)
-    
+
 end
 
 
@@ -187,20 +243,33 @@ function solvemaster_matrix(parameters, N=:auto::Union{Symbol,Int64}, verbose=fa
     	Printf.@printf("Solving master equation via the matrix method.\n")
     end
 
-    λ = parameters[2]
-    ν = parameters[3]
-    K = parameters[1]
-    δ = 1.0
-    E = λ*K/(λ+ν)/δ    # Mean
-    V = λ*K/(λ+ν)/δ + λ*ν*K^2/((λ+ν)^2)/(λ+ν+δ)/δ    # Variance
+    if length(parameters)==3
+
+	    λ = parameters[2]
+	    ν = parameters[3]
+	    K₀ = 0.0
+	    K₁ = parameters[1]
+
+	else
+
+    	λ = parameters[3]
+	    ν = parameters[4]
+	    K₀ = parameters[1]
+	    K₁ = parameters[2]
+
+	end
+
+	δ = 1.0
+    E = λ*K₁/(λ+ν)/δ    # Mean
+    V = λ*K₁/(λ+ν)/δ + λ*ν*K₁^2/((λ+ν)^2)/(λ+ν+δ)/δ    # Variance
     
     if N==:auto
         # Rule of thumb for maximum number of mRNA with non-negligible probability
         N = Int(round(E+5*sqrt(V)))
     end
-    
-    A = A_matrix(λ,ν,K,δ, N)
 
+    A = A_matrix(K₀,K₁,λ,ν,δ, N)
+    
     P = LinearAlgebra.nullspace(A)
     P = abs.(P[1:N] + P[N+1:end])
     P = P./sum(P)
@@ -212,7 +281,7 @@ end
 Function to assemble the A matrix of the master equation.
 This matrix is valid for the bursty gene expresssion model with no leaky transcription.
 """
-function A_matrix(λ,ν,K,δ, N, sparse=false)
+function A_matrix(K₀,K₁,λ,ν,δ, N, sparse=false)
 
 	if sparse
 		A = SparseArrays.spzeros(Float64, 2*N, 2*N)
@@ -221,31 +290,33 @@ function A_matrix(λ,ν,K,δ, N, sparse=false)
 	end
 
     # Assemble A row by row
-    A[1,1] = -λ
+    A[1,1] = -(λ+K₀)
     A[1,2] = δ
     A[1,1+N] = ν
 
     A[1+N,1] = λ
-    A[1+N,1+N] = -(ν+K)
+    A[1+N,1+N] = -(ν+K₁)
     A[1+N,2+N] = δ
 
     for ii = 2:N-1
-        A[ii,ii] = -(λ+δ*(ii-1))
+        A[ii,ii] = -(λ+K₀+δ*(ii-1))
         A[ii,ii+1] = δ*ii
         A[ii,ii+N] = ν
+        A[ii,ii-1] = K₀
 
         A[ii+N,ii] = λ
-        A[ii+N,ii+N] = -(ν+K+δ*(ii-1))
+        A[ii+N,ii+N] = -(ν+K₁+δ*(ii-1))
         A[ii+N,ii+N+1] = δ*ii
-        A[ii+N,ii+N-1] = K
+        A[ii+N,ii+N-1] = K₁
     end
 
     A[N,N] = -(λ+δ*(N-1))
     A[N,2*N] = ν
+    A[N,N-1] = K₀
 
     A[2*N,N] = λ
     A[2*N,2*N] = -(ν+δ*(N-1))
-    A[2*N,2*N-1] = K
+    A[2*N,2*N-1] = K₁
 
     return A
 
