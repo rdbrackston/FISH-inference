@@ -9,6 +9,7 @@ using Plots.PlotMeasures
 
 @userplot CorrPlot
 
+
 """
 Function to plot the full chains and posterior distributions.
 """
@@ -84,44 +85,6 @@ function plot_inference(chain, data, idx; guess=[],hyper=[])
 	end
 
 	return plt
-
-end
-
-
-"""
-Generate a normalized pdf from continuous data
-"""
-function genpdf(data::Array{Float64,1}, nbin=:auto::Union{Int,Symbol})
-
-    filter!(x -> !isnan(x), data)    # Remove nans from data
-
-    edges = binedges(DiscretizeUniformWidth(nbin), data)
-    disc = LinearDiscretizer(edges)
-    counts = get_discretization_counts(disc, data)
-
-    x = edges[1:end-1]+0.5*diff(edges)
-    y = (counts./(diff(edges)*float(size(data)[1]))) # Normalise
-    return (x,y)
-
-end
-
-
-"""
-1D integer version of genpdf, intended for use when the underlying data is discrete.
-"""
-function genpdf(data::Array{Int64,1}, nbin=:auto::Union{Int,Symbol})
-
-    println("Implementing integer version of genpdf.")
-    # Set bins to all the integers between lo and hi
-    lo, hi = extrema(data)
-    edges = collect(lo-1:hi) .+ 0.5
-
-    disc = LinearDiscretizer(edges)
-    counts = get_discretization_counts(disc, data)
-
-    x = edges[1:end-1]+0.5*diff(edges)
-    y = (counts./(diff(edges)*float(size(data)[1]))) # Normalise
-    return (x,y)
 
 end
 
