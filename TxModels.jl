@@ -155,6 +155,18 @@ end
 
 
 """
+Function to generate a distribution from simulating samples from a compound distribution.
+
+"""
+function simcompound(parameters::AbstractArray, hyperParameters::AbstractArray,
+                     distFunc::Symbol, parIndex=[1])
+
+	
+
+end
+
+
+"""
 Function to solve the master equation at steady state, returning the probability
 mass function. Evaluation uses the analytical expression for p(n) where possible
 before solving the matrix equation for the remaining higher values of n.
