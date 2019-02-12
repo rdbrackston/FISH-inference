@@ -281,7 +281,7 @@ function solvemaster_full(parameters, N)
     for n=0:N-1
     	for r=0:n
     		# P[n+1] += binomial(big(n),big(r))*K₁^(n-r)*(K₀-K₁)^r*GSL.hypergeom(ν+r,λ+ν+r,K₁-K₀)
-    		P[n+1] += binomial(big(n),big(r))*K₁^(n-r)*exp(-K₁)*(K₀-K₁)^r*GSL.hypergeom(ν+r,λ+ν+r,K₁-K₀)*fracrise(ν,ν+λ,r)
+    		P[n+1] += binomial(big(n),big(r)) * big(K₁)^(n-r) * exp(-K₁) * big(K₀-K₁)^r * GSL.hypergeom(ν+r,λ+ν+r,K₁-K₀) * fracrise(ν,ν+λ,r)
     	end
     	P[n+1] = P[n+1]/factorial(big(n))
     end
