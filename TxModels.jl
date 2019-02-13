@@ -270,16 +270,16 @@ end
 """
 Function to evaluate the analytical distribution for the leaky gene expression model.
 Called by solvemaster for cases in which parameters has length four.
-!! Hopefully OK now !!
+!! Has numerical stability issues for large n, solution is work in progress !!
 """
 function fracrise(x, y, r)
-Q = 1
-	for m=0:r-1
-	Q *= (x + m) / (y + m)
-	end 
-return Q
-end 
-	
+	Q = 1
+		for m=0:r-1
+			Q *= (x + m) / (y + m)
+		end
+	return Q
+end
+
 function solvemaster_full(parameters, N)
 
 	# Assign the parameters
@@ -290,12 +290,18 @@ function solvemaster_full(parameters, N)
     δ = 1.0
 
 	P = zeros(N)
+	Max = 150
     for n=0:N-1
     	for r=0:n
-    		# P[n+1] += binomial(big(n),big(r))*K₁^(n-r)*(K₀-K₁)^r*GSL.hypergeom(ν+r,λ+ν+r,K₁-K₀)
-    		P[n+1] += binomial(big(n),big(r)) * big(K₁)^(n-r) * exp(-K₁) * big(K₀-K₁)^r * GSL.hypergeom(ν+r,λ+ν+r,K₁-K₀) * fracrise(ν,ν+λ,r)
+    		if r>Max && (n-r)>Max
+    			println(n)
+    			P[n+1] +=  big(ℯ*K₁/(n-r))^(n-r) * big(ℯ*(K₀-K₁)/r)^r * GSL.hypergeom(ν+r,λ+ν+r,K₁-K₀) * 
+    					   fracrise(ν,ν+λ,r) * ℯ^(-K₁)  / (2π * sqrt(r*(n-r)))
+    		else
+    			P[n+1] += big(K₁)^(n-r) * big(K₀-K₁)^r * GSL.hypergeom(ν+r,λ+ν+r,K₁-K₀) * 
+    					  fracrise(ν,ν+λ,r) * ℯ^(-K₁) / (factorial(big(n-r)) * factorial(big(r)))	
+    		end
     	end
-    	P[n+1] = P[n+1]/factorial(big(n))
     end
 
     P = P./sum(P)
