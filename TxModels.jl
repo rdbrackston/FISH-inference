@@ -11,6 +11,68 @@ include("Utilities.jl")
 
 
 """
+Function to draw many samples from a compound distribution
+"""
+function samplecompound(parameters::AbstractArray, hyperParameters::AbstractArray,
+						distFunc::Symbol, mixDist::Symbol, Nsamp::Int=1000)
+
+	smpls = zeros(Nsamp)
+
+	m = parameters[1]
+    λ = parameters[2]
+    ν = parameters[3]
+    v = hyperParameters[1]^2
+    if isequal(mixDist,:LogNormal)
+        parDistribution = LogNormal(log(m/sqrt(1+v/m^2)),sqrt(log(1+v/m^2)))
+
+    elseif isequal(mixDist,:Gamma)
+        θ = v/m
+        k = m^2/v
+        parDistribution = Gamma(k,θ)
+
+    elseif isequal(mixDist,:Normal)
+        lossFunc = prms->trunc_norm_loss(prms,m,v)
+        res = optimize(lossFunc, [m,sqrt(v)]).minimizer
+        parDistribution = TruncatedNormal(res[1],res[2], 0.0,Inf)
+
+    else
+        error("Mixing distribution not recognised.
+               Current options are LogNormal, Gamma and (Truncated) Normal")
+    end
+
+    if isequal(distFunc,:NegativeBinomial)
+		for ii=1:Nsamp
+			# Draw parameter from mixDist
+			K = rand(parDistribution,1)[1]
+			p = ν/(K+ν)
+
+			# Sample from main distribution, with unique parametrization
+			d = NegativeBinomial(λ,p)
+			smpls[ii] = rand(d, 1)[1]
+		end
+
+	elseif isequal(distFunc,:Poisson)
+		for ii=1:Nsamp
+			# Draw parameter from mixDist
+			K = rand(parDistribution,1)[1]
+
+			# Sample from main distribution, with unique parametrization
+			d = Poisson(K)
+			smpls[ii] = rand(d, 1)[1]
+
+		end
+
+	else
+		error("Main distribution not recognised.
+               Current options are NegativeBinomial and Poisson")
+	end
+
+	return smpls
+
+end
+
+
+"""
 Function to obtain the steady state distribution when one or more parameters are
 drawn from a distribution. Recursively marginalises over each parameter in turn.
 """
