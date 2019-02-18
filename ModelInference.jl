@@ -76,8 +76,8 @@ with a particular set of parameters.
 function log_likelihood(parameters, data)
     
     Nmax = Integer(round(maximum(data)))    # Maximum value in the data
-    # P = solvemaster(parameters,Nmax+1)
-    P = solvemaster(parameters)
+    P = solvemaster(parameters,Nmax+1)
+    # P = solvemaster(parameters)
     N = length(P)    # P runs from zero to N-1
     countVec = collect(0:max(N,Nmax))
     Pfull = zeros(Float64, size(countVec))
@@ -98,7 +98,7 @@ with a particular set of parameters.
 """
 function log_likelihood_compound(baseParams, distParams, distFunc, idx, data; lTheta::Integer=100, cdfMax::AbstractFloat=0.98)
     
-    Nmax = Integer(round(maximum(data)))    # Maximum value in the data
+    Nmax = Integer(round(maximum(data)))+1    # Maximum value in the data
     P = solvecompound(baseParams, distParams, distFunc, idx; N=Nmax)
     L = length(P)
     N = max(L,Nmax)    # P runs from zero to N-1
@@ -111,6 +111,21 @@ function log_likelihood_compound(baseParams, distParams, distFunc, idx, data; lT
     
     return sum(log.(lVec))
     
+end
+
+
+"""
+Function to perform the optimization maximising the logPfunc.
+"""
+function maximumlikelihood(x0, logPfunc, verbose=true)
+
+    func(x) = 1/logPfunc(x)
+    res = optimize(func, x0)
+    optPrms = Optim.minimizer(res)
+
+    println(Printf.@sprintf("AIC value of %.2f",-2*logPfunc(optPrms)+2*4))
+    return optPrms
+
 end
 
 
@@ -266,7 +281,7 @@ end
 
 
 """
-Function to shrink the MCMC chain, removing the burn-in samples and thinning the remainder.
+Function to prune the MCMC chain, removing the burn-in samples and thinning the remainder.
 """
 function chain_reduce(chains; burn::Integer=500, step::Integer=500)
 
