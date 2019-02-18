@@ -61,7 +61,6 @@ function samplecompound(parameters::AbstractArray, hyperParameters::AbstractArra
 			# Sample from main distribution, with unique parametrization
 			d = Poisson(K)
 			smpls[ii] = rand(d, 1)[1]
-
 		end
 
 	else
@@ -166,7 +165,7 @@ end
 
 
 """
-Function to set up and run a simulation of the system, returing a solution
+Function to set up and run a simulation of the system, returning a solution
 """
 function runsim(parameters)
 
@@ -178,11 +177,11 @@ function runsim(parameters)
 	end
 
 	# Setup the problem
-	x₀ = [prms[2],1,0]
+	x₀ = [Integer(round(prms[2])),1,0]
 	tspan = (0.0, 200000.0)
 	prob = DiscreteProblem(x₀,tspan,prms)
 
-	# RNA synthesis aty rate K₀
+	# RNA synthesis at rate K₀
 	jumprate1(u,p,t) = u[3]*p[1]
 	affect1!(integrator) = integrator.u[1] += 1.
 	jump1 = ConstantRateJump(jumprate1,affect1!)
@@ -220,7 +219,7 @@ Function to return samples from a simulation
 function samplemaster(parameters, N::Integer=1000)
 
 	sol = runsim(parameters)
-	tSamp = 100.0 .+ (sol.t[end]-100.0)*rand(10000)
+	tSamp = 100.0 .+ (sol.t[end]-100.0)*rand(N)
     simData = [sol(tSamp[ii])[1] for ii=1:length(tSamp)]
 
 end
@@ -239,12 +238,40 @@ end
 
 """
 Function to generate a distribution from simulating samples from a compound distribution.
-
 """
 function simcompound(parameters::AbstractArray, hyperParameters::AbstractArray,
-                     distFunc::Symbol, parIndex=[1])
+                     mixDist::Symbol, parIndex=[1], Nsamp::Integer=1000)
 
-	
+	simData = zeros(Nsamp)
+
+	m = parameters[1]
+    λ = parameters[2]
+    ν = parameters[3]
+    v = hyperParameters[1]^2
+    if isequal(mixDist,:LogNormal)
+        parDistribution = LogNormal(log(m/sqrt(1+v/m^2)),sqrt(log(1+v/m^2)))
+
+    elseif isequal(mixDist,:Gamma)
+        θ = v/m
+        k = m^2/v
+        parDistribution = Gamma(k,θ)
+
+    elseif isequal(mixDist,:Normal)
+        lossFunc = prms->trunc_norm_loss(prms,m,v)
+        res = optimize(lossFunc, [m,sqrt(v)]).minimizer
+        parDistribution = TruncatedNormal(res[1],res[2], 0.0,Inf)
+
+    else
+        error("Mixing distribution not recognised.
+               Current options are LogNormal, Gamma and (Truncated) Normal")
+    end
+
+	for ii=1:Nsamp
+		parameters[parIndex...] = rand(parDistribution,1)[1]
+		simData[ii] = samplemaster(parameters)[1]
+	end
+
+	return Integer.(round.(simData))
 
 end
 
@@ -276,7 +303,7 @@ function solvemaster(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
 	    if N==:auto
 	        N = Nguess
 	    else
-	    	N = min(N,Nguess)
+	    	# N = min(N,Nguess)
 	    end
 
 	    return solvemaster_full(parameters, N)
@@ -295,7 +322,7 @@ function solvemaster(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
 	    if N==:auto
 	        N = Nguess
 	    else
-	    	N = min(N,Nguess)
+	    	# N = min(N,Nguess)
 	    end
 
 	    a = λ/δ
