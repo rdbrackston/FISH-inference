@@ -11,7 +11,9 @@ include("Utilities.jl")
 
 
 """
-Function to draw many samples from a compound distribution
+Function to draw many samples from one of the special case compound distributions.
+Valid if the underlying gene expression is either constitutive (poisson) or 
+extremely bursty (NegataveBinomial).
 """
 function samplecompound(parameters::AbstractArray, hyperParameters::AbstractArray,
 						distFunc::Symbol, mixDist::Symbol, Nsamp::Int=1000)
@@ -164,9 +166,9 @@ end
 
 
 """
-Function to evaluate a normalised probability distribution from a simulation
+Function to set up and run a simulation of the system, returing a solution
 """
-function simmaster(parameters)
+function runsim(parameters)
 
 	# Set up full length parameter vector
 	if length(parameters)==3
@@ -208,9 +210,28 @@ function simmaster(parameters)
 	# Run simulation
 	jump_prob = JumpProblem(prob,Direct(),jump1,jump2,jump3,jump4,jump5)
     sol = solve(jump_prob, FunctionMap(), maxiters=10^8)
-    tSamp = 100.0 .+ (prob.tspan[2]-100.0)*rand(10000)
+
+end
+
+
+"""
+Function to return samples from a simulation
+"""
+function samplemaster(parameters, N::Integer=1000)
+
+	sol = runsim(parameters)
+	tSamp = 100.0 .+ (sol.t[end]-100.0)*rand(10000)
     simData = [sol(tSamp[ii])[1] for ii=1:length(tSamp)]
 
+end
+
+
+"""
+Function to evaluate a normalised probability distribution from a simulation
+"""
+function simmaster(parameters)
+
+    simData = samplemaster(parameters, 10000)
     bin,P = genpdf(Integer.(round.(simData)))
 
 end
