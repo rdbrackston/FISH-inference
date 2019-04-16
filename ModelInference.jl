@@ -9,11 +9,11 @@ function load_data(File::String, Folder::String, cutOff::Number=Inf)
     if occursin(".csv",File)
         rnaData = CSV.read(Folder*File, datarow=1)[1]
     else
-	   rnaData = CSV.read(Folder*File*".csv", datarow=1)[1]
+	    rnaData = CSV.read(Folder*File*".csv", datarow=1)[1]
     end
 
     try
-	   rnaData = collect(Missings.replace(rnaData, NaN))
+	    rnaData = collect(Missings.replace(rnaData, NaN))
     catch
         rnaData = collect(Missings.replace(rnaData, 0))
     end
@@ -32,7 +32,7 @@ function load_data(File::String, Folder::String, cutOff::Number=Inf)
         global fltData = rnaData
     end
 
-	return fltData
+	return Integer.(round.(fltData))
 
 end
 
@@ -96,10 +96,10 @@ end
 Function to evaluate the log-likelihood of the data, given the compound model
 with a particular set of parameters.
 """
-function log_likelihood_compound(baseParams, distParams, distFunc, idx, data; lTheta::Integer=100, cdfMax::AbstractFloat=0.98)
+function log_likelihood_compound(baseParams, distParams, distFunc, idx, data; lTheta::Integer=250, cdfMax::AbstractFloat=0.999)
     
     Nmax = Integer(round(maximum(data)))+1    # Maximum value in the data
-    P = solvecompound(baseParams, distParams, distFunc, idx; N=Nmax)
+    P = solvecompound(baseParams, distParams, distFunc, idx; N=Nmax, lTheta=lTheta, cdfMax=cdfMax)
     L = length(P)
     N = max(L,Nmax)    # P runs from zero to N-1
     countVec = collect(0:N)
@@ -117,13 +117,31 @@ end
 """
 Function to perform the optimization maximising the logPfunc.
 """
-function maximumlikelihood(x0, logPfunc, verbose=true)
+function maximumlikelihood(x0, logPfunc, verbose=false)
 
     func(x) = 1/logPfunc(x)
-    res = optimize(func, x0)
+    nx = length(x0)
+    res = optimize(func, zeros(nx), Inf.*ones(nx), x0)
+    if  false #Optim.f_calls(res) == 1
+        res = optimize(func, x0)
+    end
+    # try
+    #     res = optimize(func, x0)
+    # catch
+    #     nx = length(x0)
+    #     res = optimize(func, zeros(nx), Inf.*ones(nx), x0)
+    # end
+
+    println(Optim.x_converged(res))
+    println(Optim.f_converged(res))
+    println(Optim.g_converged(res))
+    println(Optim.iterations(res))
+    println(Optim.f_calls(res))
     optPrms = Optim.minimizer(res)
 
-    println(Printf.@sprintf("AIC value of %.2f",-2*logPfunc(optPrms)+2*4))
+    if verbose
+        println(Printf.@sprintf("AIC value of %.2f",-2*logPfunc(optPrms)+2*4))
+    end
     return optPrms
 
 end

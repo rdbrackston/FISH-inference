@@ -68,7 +68,7 @@ function samplecompound(parameters::AbstractArray, hyperParameters::AbstractArra
                Current options are NegativeBinomial and Poisson")
 	end
 
-	return smpls
+	return Integer.(smpls)
 
 end
 
@@ -78,8 +78,8 @@ Function to obtain the steady state distribution when one or more parameters are
 drawn from a distribution. Recursively marginalises over each parameter in turn.
 """
 function solvecompound(parameters::AbstractArray, hyperParameters::AbstractArray,
-                       distFunc::Symbol, parIndex=[1]; lTheta::Integer=100,
-                       cdfMax::AbstractFloat=0.98, N::Union{Symbol,Integer}=:auto,
+                       distFunc::Symbol, parIndex=[1]; lTheta::Integer=200,
+                       cdfMax::AbstractFloat=0.999, N::Union{Symbol,Integer}=:auto,
                        verbose=false)
     
     # Choose mixing distribution. The mean and variance are identical from case to case.
