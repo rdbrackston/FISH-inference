@@ -9,7 +9,7 @@ c=1.2 #coefficient of variation
 #mu as a function of mean copy number y
 u(y) = l * (EK / (d * y)) - l
 
-#Fano factor as a function of mean copy number y (for Telegraph model-instrinsic noise)
+#Fano factor as a function of mean copy number y (for Telegraph model-intrinsic noise)
 Fano(y)= 1 - ((l * EK) / (d * (l + u(y)))) + ((l + d)*EK)/ (d * (l + u(y) + d))
 x = 10 .^(-0.5:0.01:log10(EK/d))
 plot(x,Fano, line=:dash, xscale=:log10, color=:red, xlabel="Mean expression level", ylabel="Fano Factor", legend=:topleft, label="Intrinsic noise", dpi=200)
