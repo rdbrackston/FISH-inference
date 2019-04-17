@@ -179,6 +179,11 @@ function mcmc_metropolis(x0::AbstractArray, logPfunc::Function, Lchain::Integer;
     for ii=2:Lchain
         proposal = MvNormal(propVar.*sqrt.(xOld))
         xNew = xOld + rand(proposal)
+
+        # Reject if any x are negative
+        if any(x->x<0, xNew); continue; end
+
+        # Evaluate new log-likelihood
         if prior == :none
 	    	logpNew = logPfunc(xNew)
 	    else
@@ -265,6 +270,11 @@ function mcmc_metropolis_par(x0::AbstractArray, logPfunc::Function, Lchain::Inte
 	    for jj=2:Lchain
             proposal = MvNormal(propVar.*sqrt.(xOld))
 	        xNew = xOld + rand(r[Threads.threadid()], proposal)
+
+            # Reject if any x are negative
+            if any(x->x<0, xNew); continue; end
+
+            # Evaluate new log-likelihood
 	        if prior == :none
 		    	logpNew = logPfunc(xNew)
 		    else
