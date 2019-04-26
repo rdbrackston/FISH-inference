@@ -321,3 +321,58 @@ function chain_reduce(chains; burn::Integer=500, step::Integer=500)
     vcat(tmp...)
 
 end
+
+
+"""
+Function to perform optimum parameter fitting.
+"""
+function optfit(x0, lossFunc::Function)
+
+    nx = length(x0)
+    res = optimize(lossFunc, zeros(nx), Inf.*ones(nx), x0)
+
+    optPrms = Optim.minimizer(res)
+end
+
+
+"""
+Function to evaluate the difference between a histogram of the data and a given distribition.
+"""
+function dist_loss_func(data, distribution::Distribution, p::Integer=1)
+
+    x,y = genpdf(Integer.(round.(data)))
+    xmax = Integer(round(max(maximum(x), invlogcdf(distribution, log(0.999)))))
+    y = [zeros(Integer(minimum(x)))..., y...]
+
+    loss = 0.0
+    for ix = 0:xmax
+        try
+            loss += abs(y[ix+1] - pdf(distribution,ix))^p
+        catch
+            loss += abs(pdf(distribution,ix))^p
+        end
+    end
+
+    return loss
+
+end
+
+
+"""
+Function to evaluate the KUllback-Leibler divergence between histogrammed data and a distribution
+"""
+function KL_loss_func(data, distribution::Distribution)
+
+    x,y = genpdf(Integer.(round.(data)))
+    y = [zeros(Integer(minimum(x)))..., y...]
+
+    loss = 0.0
+    for ix = 0:Integer(maximum(x))
+        if !iszero(y[ix+1])
+            loss += y[ix+1]*log2(y[ix+1]/pdf(distribution,ix))
+        end
+    end
+
+    return loss
+
+end
