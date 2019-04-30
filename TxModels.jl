@@ -7,6 +7,7 @@ import LinearAlgebra, GSL, Printf, Base.Threads, Random, Future, SparseArrays, S
 
 include("ModelInference.jl")
 include("PlotUtils.jl")
+include("Distribution.jl")
 include("Utilities.jl")
 
 
@@ -45,27 +46,37 @@ function samplecompound(parameters::AbstractArray, hyperParameters::AbstractArra
     if isequal(distFunc,:NegativeBinomial)
 		for ii=1:Nsamp
 			# Draw parameter from mixDist
-			K = rand(parDistribution,1)[1]
+			K = Distributions.rand(parDistribution)
 			p = ν/(K+ν)
 
 			# Sample from main distribution, with unique parametrization
 			d = NegativeBinomial(λ,p)
-			smpls[ii] = rand(d, 1)[1]
+			smpls[ii] = Distributions.rand(d)
 		end
 
 	elseif isequal(distFunc,:Poisson)
 		for ii=1:Nsamp
 			# Draw parameter from mixDist
-			K = rand(parDistribution,1)[1]
+			K = Distributions.rand(parDistribution)
 
 			# Sample from main distribution, with unique parametrization
 			d = Poisson(K)
-			smpls[ii] = rand(d, 1)[1]
+			smpls[ii] = Distributions.rand(d)
+		end
+
+	elseif isequal(distFunc,:Telegraph)
+		for ii=1:Nsamp
+			# Draw parameter from mixDist
+			K = Distributions.rand(parDistribution)
+
+			# Sample from main distribution, with unique parametrization
+			d = TelegraphDist(K,λ,ν)
+			smpls[ii] = rand(d)
 		end
 
 	else
 		error("Main distribution not recognised.
-               Current options are NegativeBinomial and Poisson")
+               Current options are NegativeBinomial, Poisson or Telegraph")
 	end
 
 	return Integer.(smpls)
@@ -219,7 +230,7 @@ Function to return samples from a simulation
 function samplemaster(parameters, N::Integer=1000)
 
 	sol = runsim(parameters)
-	tSamp = 100.0 .+ (sol.t[end]-100.0)*rand(N)
+	tSamp = 100.0 .+ (sol.t[end]-100.0)*Base.rand(N)
     simData = [sol(tSamp[ii])[1] for ii=1:length(tSamp)]
 
 end
@@ -267,7 +278,7 @@ function simcompound(parameters::AbstractArray, hyperParameters::AbstractArray,
     end
 
 	for ii=1:Nsamp
-		parameters[parIndex...] = rand(parDistribution,1)[1]
+		parameters[parIndex...] = Distributions.rand(parDistribution)
 		simData[ii] = samplemaster(parameters)[1]
 	end
 
