@@ -177,7 +177,7 @@ function mcmc_metropolis(x0::AbstractArray, logPfunc::Function, Lchain::Integer;
     end
     
     for ii=2:Lchain
-        proposal = MvNormal(propVar.*sqrt.(xOld))
+        proposal = MvNormal(propVar.*xOld)
         xNew = xOld + rand(proposal)
 
         # Reject if any x are negative
@@ -268,7 +268,7 @@ function mcmc_metropolis_par(x0::AbstractArray, logPfunc::Function, Lchain::Inte
 		end
 	    
 	    for jj=2:Lchain
-            proposal = MvNormal(propVar.*sqrt.(xOld))
+            proposal = MvNormal(propVar.*xOld)
 	        xNew = xOld + rand(r[Threads.threadid()], proposal)
 
             # Reject if any x are negative
