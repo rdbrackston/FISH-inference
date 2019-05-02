@@ -20,6 +20,8 @@ function rand(d::TelegraphDist)
 	s = quantile(d,r)
 
 end
+Distributions.rand(d::TelegraphDist) = rand(d::TelegraphDist)
+
 
 """ Required by distributions. """
 sampler(d::TelegraphDist) = d

@@ -4,6 +4,7 @@ module TxModels
 
 using Distributions, CSV, DataFrames, Plots, Optim, DifferentialEquations
 import LinearAlgebra, GSL, Printf, Base.Threads, Random, Future, SparseArrays, SpecialFunctions, DelimitedFiles
+export TelegraphDist
 
 include("ModelInference.jl")
 include("PlotUtils.jl")
