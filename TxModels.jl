@@ -10,6 +10,7 @@ include("ModelInference.jl")
 include("PlotUtils.jl")
 include("Distribution.jl")
 include("Utilities.jl")
+include("SpecialCases.jl")
 
 
 """
