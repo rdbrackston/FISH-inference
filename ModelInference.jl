@@ -4,7 +4,7 @@
 Function to load in the experimental data, filtering out missings/NaNs and
 applying upper cut-off in terms of standard deviations from the mean.
 """
-function load_data(File::String, Folder::String, cutOff::Number=Inf)
+function load_data(File::String, Folder::String, cutOff::Number=Inf, format=:Int)
 
     if occursin(".csv",File)
         rnaData = CSV.read(Folder*File, datarow=1)[1]
@@ -19,20 +19,13 @@ function load_data(File::String, Folder::String, cutOff::Number=Inf)
     end
 	filter!(x -> !isnan(x), rnaData)
 
-	nMax = maximum(round.(rnaData))
-    if !isinf(cutOff)
-    	for ii=1:nMax
-    		global fltData = filter(x -> x<nMax-ii, rnaData)
-    		# if maximum(fltData)<cutOff*mean(fltData)
-    		if maximum(fltData)<mean(fltData)+cutOff*std(fltData)
-    			break
-    		end
-    	end
-    else
-        global fltData = rnaData
-    end
+    fltData = filter(x->x<cutOff, rnaData)
 
-	return Integer.(round.(fltData))
+    if format==:Int
+	    return Integer.(round.(fltData))
+    else
+        return fltData
+    end
 
 end
 
@@ -41,7 +34,7 @@ end
 Function to load in two sets of experimental data, filtering out missings/NaNs 
 from both sets togetehr to maintain equal length.
 """
-function load_data(File1::String, File2::String, Folder::String)
+function load_data(File1::String, File2::String, Folder::String, cutOff1::Float64=Inf, cutOff2::Float64=Inf)
 
     # Load in the two sets of data, robust to inclusion/exclusion of ".csv"
     if occursin(".csv",File1)
@@ -61,8 +54,8 @@ function load_data(File1::String, File2::String, Folder::String)
     end
 
     L = length(data1)
-    data1Filt = [data1[ii] for ii=1:L if !isnan(data1[ii]) && !isnan(data2[ii])]
-    data2Filt = [data2[ii] for ii=1:L if !isnan(data1[ii]) && !isnan(data2[ii])]
+    data1Filt = [data1[ii] for ii=1:L if !isnan(data1[ii]) && !isnan(data2[ii]) && data1[ii]<cutOff1 && data2[ii]<cutOff2]
+    data2Filt = [data2[ii] for ii=1:L if !isnan(data1[ii]) && !isnan(data2[ii]) && data1[ii]<cutOff1 && data2[ii]<cutOff2]
 
     return data1Filt, data2Filt
 
@@ -75,7 +68,7 @@ with a particular set of parameters.
 """
 function log_likelihood(parameters, data)
     
-    Nmax = Integer(round(maximum(data)))    # Maximum value in the data
+    Nmax = Integer(round(Base.maximum(data)))    # Maximum value in the data
     P = solvemaster(parameters,Nmax+1)
     # P = solvemaster(parameters)
     N = length(P)    # P runs from zero to N-1
@@ -98,7 +91,7 @@ with a particular set of parameters.
 """
 function log_likelihood_compound(baseParams, distParams, distFunc, idx, data; lTheta::Integer=250, cdfMax::AbstractFloat=0.999)
     
-    Nmax = Integer(round(maximum(data)))+1    # Maximum value in the data
+    Nmax = Integer(round(Base.maximum(data)))+1    # Maximum value in the data
     P = solvecompound(baseParams, distParams, distFunc, idx; N=Nmax, lTheta=lTheta, cdfMax=cdfMax)
     L = length(P)
     N = max(L,Nmax)    # P runs from zero to N-1
@@ -117,26 +110,18 @@ end
 """
 Function to perform the optimization maximising the logPfunc.
 """
-function maximumlikelihood(x0, logPfunc, verbose=false)
+function maximumlikelihood(x0, logPfunc, upper=:Auto, verbose=false)
 
     func(x) = 1/logPfunc(x)
     nx = length(x0)
-    res = optimize(func, zeros(nx), Inf.*ones(nx), x0)
+    if upper==:Auto
+        upper = Inf.*ones(nx)
+    end
+    res = optimize(func, zeros(nx), upper, x0)
     if  false #Optim.f_calls(res) == 1
         res = optimize(func, x0)
     end
-    # try
-    #     res = optimize(func, x0)
-    # catch
-    #     nx = length(x0)
-    #     res = optimize(func, zeros(nx), Inf.*ones(nx), x0)
-    # end
 
-    println(Optim.x_converged(res))
-    println(Optim.f_converged(res))
-    println(Optim.g_converged(res))
-    println(Optim.iterations(res))
-    println(Optim.f_calls(res))
     optPrms = Optim.minimizer(res)
 
     if verbose
@@ -151,9 +136,9 @@ end
 Function to perform the MCMC metropolis algorithm.
 """
 function mcmc_metropolis(x0::AbstractArray, logPfunc::Function, Lchain::Integer;
-                         propVar::AbstractFloat=0.1, burn::Integer=500,
-                         step::Integer=500, printFreq::Integer=10000,
-                         prior=:none, verbose=true)
+                         propStd::Union{AbstractFloat,AbstractArray}=0.1,
+                         step::Integer=500, burn::Integer=500, printFreq::Integer=10000,
+                         prior=:none, verbose::Bool=true, scaleProp::Bool=true)
     
 	if length(size(x0)) > 1 # restart from old chain
         if verbose; println("Restarting from old chain"); end
@@ -172,13 +157,21 @@ function mcmc_metropolis(x0::AbstractArray, logPfunc::Function, Lchain::Integer;
     else
         logpOld = logPfunc(xOld)
         for  (ip,prr) in enumerate(prior)
-        	logpOld += log(pdf(prr,xOld[ip]))
+        	logpOld += log(Distributions.pdf(prr,xOld[ip]))
         end
     end
     
     for ii=2:Lchain
-        proposal = MvNormal(propVar.*xOld)
-        xNew = xOld + rand(proposal)
+        if scaleProp
+            proposal = MvNormal(propStd.*xOld)
+        else
+            if isa(propStd, Array)
+                proposal = MvNormal(propStd)
+            else
+                proposal = MvNormal(propStd.*ones(size(xOld)))
+            end
+        end
+        xNew = xOld + Distributions.rand(proposal)
 
         # Reject if any x are negative
         if any(x->x<0, xNew); continue; end
@@ -189,13 +182,13 @@ function mcmc_metropolis(x0::AbstractArray, logPfunc::Function, Lchain::Integer;
 	    else
 	        logpNew = 0.0
 	        for  (ip,prr) in enumerate(prior)
-	        	logpNew += log(pdf(prr,xNew[ip]))
+	        	logpNew += log(Distributions.pdf(prr,xNew[ip]))
 	        end
 	        if !isinf(logpNew); logpNew += logPfunc(xNew); end
 	    end
         a = exp(logpNew - logpOld)
 
-        if rand(1)[1] < a
+        if Base.rand() < a
             xOld = xNew
             logpOld = logpNew
             acc += 1
@@ -269,7 +262,7 @@ function mcmc_metropolis_par(x0::AbstractArray, logPfunc::Function, Lchain::Inte
 	    
 	    for jj=2:Lchain
             proposal = MvNormal(propVar.*xOld)
-	        xNew = xOld + rand(r[Threads.threadid()], proposal)
+	        xNew = xOld + Distributions.rand(r[Threads.threadid()], proposal)
 
             # Reject if any x are negative
             if any(x->x<0, xNew); continue; end
@@ -287,7 +280,7 @@ function mcmc_metropolis_par(x0::AbstractArray, logPfunc::Function, Lchain::Inte
 		    end
 	        a = exp(logpNew - logpOld)
 
-	        if rand(r[Threads.threadid()],1)[1] < a
+	        if Base.rand(r[Threads.threadid()]) < a
 	            xOld = xNew
 	            logpOld = logpNew
 	            Threads.atomic_add!(acc, 1)
@@ -341,8 +334,8 @@ Function to evaluate the difference between a histogram of the data and a given 
 function dist_loss_func(data, distribution::Distribution, p::Integer=1)
 
     x,y = genpdf(Integer.(round.(data)))
-    xmax = Integer(round(max(maximum(x), invlogcdf(distribution, log(0.999)))))
-    y = [zeros(Integer(minimum(x)))..., y...]
+    xmax = Integer(round(max(Base.maximum(x), invlogcdf(distribution, log(0.999)))))
+    y = [zeros(Integer(Base.minimum(x)))..., y...]
 
     loss = 0.0
     for ix = 0:xmax
@@ -364,10 +357,10 @@ Function to evaluate the KUllback-Leibler divergence between histogrammed data a
 function KL_loss_func(data, distribution::Distribution)
 
     x,y = genpdf(Integer.(round.(data)))
-    y = [zeros(Integer(minimum(x)))..., y...]
+    y = [zeros(Integer(Base.minimum(x)))..., y...]
 
     loss = 0.0
-    for ix = 0:Integer(maximum(x))
+    for ix = 0:Integer(Base.maximum(x))
         if !iszero(y[ix+1])
             loss += y[ix+1]*log2(y[ix+1]/pdf(distribution,ix))
         end

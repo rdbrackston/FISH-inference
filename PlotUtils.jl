@@ -23,14 +23,14 @@ function plot_chain(chain)
 
 		smpls = chain[:,ii]
 		kdeObj = KDE.kde(smpls)
-		x = collect(range(minimum(smpls),stop=maximum(smpls),length=100))
+		x = collect(range(Base.minimum(smpls),stop=Base.maximum(smpls),length=100))
 		y = map(z->KDE.pdf(kdeObj,z),x)
 		if ii ==1
 			tmp = plot(x,y, label="Posterior", legend=:top);
-			plot!(tmp, [mean(chain,dims=1)[ii],mean(chain,dims=1)[ii]],[0,maximum(y)], label="Mean");
+			plot!(tmp, [mean(chain,dims=1)[ii],mean(chain,dims=1)[ii]],[0,Base.maximum(y)], label="Mean");
 		else
 			tmp = plot(x,y, legend=false);
-			plot!(tmp, [mean(chain,dims=1)[ii],mean(chain,dims=1)[ii]],[0,maximum(y)]);
+			plot!(tmp, [mean(chain,dims=1)[ii],mean(chain,dims=1)[ii]],[0,Base.maximum(y)]);
 		end
 		plots[ii+nVar] = tmp;
 
@@ -101,17 +101,17 @@ function plot_posteriors(chain, priors)
 
         smpls = chain[:,ii]
         kdeObj = KDE.kde(smpls)
-        x = collect(range(minimum(smpls),stop=maximum(smpls),length=100))
+        x = collect(range(Base.minimum(smpls),stop=Base.maximum(smpls),length=100))
         y = map(z->KDE.pdf(kdeObj,z),x)
         p = map(z->Distributions.pdf(priors[ii],z))
 
         if ii ==1
             tmp = plot(x,(y), label="Posterior", legend=:top);
-            plot!(tmp, [mean(chain,dims=1)[ii],mean(chain,dims=1)[ii]],[0,maximum(y)], label="Mean");
+            plot!(tmp, [mean(chain,dims=1)[ii],mean(chain,dims=1)[ii]],[0,Base.maximum(y)], label="Mean");
             plot!(x, (p), label="Prior");
         else
             tmp = plot(x,y, legend=false);
-            plot!(tmp, [mean(chain,dims=1)[ii],mean(chain,dims=1)[ii]],[0,maximum(y)]);
+            plot!(tmp, [mean(chain,dims=1)[ii],mean(chain,dims=1)[ii]],[0,Base.maximum(y)]);
             plot!(x, (p));
         end
         plots[ii] = tmp;
