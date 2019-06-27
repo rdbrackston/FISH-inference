@@ -19,13 +19,14 @@ Valid if the underlying gene expression is either constitutive (poisson) or
 extremely bursty (NegataveBinomial).
 """
 function samplecompound(parameters::AbstractArray, hyperParameters::AbstractArray,
-						distFunc::Symbol, mixDist::Symbol, Nsamp::Int=1000)
+						distFunc::Symbol, mixDist::Symbol, Nsamp::Int=1000; parIdx::Int=1)
 
 	smpls = zeros(Nsamp)
 
-	m = parameters[1]
+	K = parameters[1]
     λ = parameters[2]
     ν = parameters[3]
+    m = parameters[parIdx]
     v = hyperParameters[1]^2
     if isequal(mixDist,:LogNormal)
         parDistribution = LogNormal(log(m/sqrt(1+v/m^2)),sqrt(log(1+v/m^2)))
@@ -69,10 +70,12 @@ function samplecompound(parameters::AbstractArray, hyperParameters::AbstractArra
 	elseif isequal(distFunc,:Telegraph)
 		for ii=1:Nsamp
 			# Draw parameter from mixDist
-			K = Distributions.rand(parDistribution)
+			θ = Distributions.rand(parDistribution)
+            prms = deepcopy(parameters)
+            prms[parIdx] = θ
 
 			# Sample from main distribution, with unique parametrization
-			d = TelegraphDist(K,λ,ν)
+			d = TelegraphDist(prms...)
 			smpls[ii] = rand(d)
 		end
 
