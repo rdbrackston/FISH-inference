@@ -32,7 +32,7 @@ end
 
 """
 Function to load in two sets of experimental data, filtering out missings/NaNs 
-from both sets togetehr to maintain equal length.
+from both sets together to maintain equal length.
 """
 function load_data(File1::String, File2::String, Folder::String, cutOff1::Float64=Inf, cutOff2::Float64=Inf)
 
@@ -312,6 +312,93 @@ function chain_reduce(chains; burn::Integer=500, step::Integer=500)
     end
 
     vcat(tmp...)
+
+end
+
+
+"""
+Function to find the MAP from the posterior distribution.
+Finds independently for each parameter.
+"""
+function find_MAP(chain; idx=1)
+
+    if length(size(chain))>1
+        data = chain[:,idx]
+    else
+        data = copy(chain)
+    end
+
+    # Perform the KDE
+    kdeObj = kde_wrpr(data)
+
+    # Find MAP via optimisation
+    func = x->KDE.pdf(kdeObj,x[1])
+    # s = std(data)
+    # m = mean(data)
+    # res = optimize(func, [m-s], [m+s], [m])
+    # MAP = Optim.minimizer(res)
+
+    x = collect(range(min(data...),stop=max(data...),length=10000))
+    y = map(func,x)
+    MAP = x[y.==maximum(y)][1]
+
+    # Check for multi-modality, warning if true
+
+    return MAP
+
+end
+
+
+"""
+Function to find the MAP from the posterior distribution.
+Finds independently for each parameter.
+"""
+function credibleintervals(chain; idx=1, spread=0.682)
+
+    if length(size(chain))>1
+        data = chain[:,idx]
+    else
+        data = copy(chain)
+    end
+
+    # Perform the KDE
+    kdeObj = kde_wrpr(data)
+    func = z->KDE.pdf(kdeObj,z)
+    x = collect(range(min(data...),stop=max(data...),length=10000))
+    dx = x[2]-x[1]
+    y = map(func,x)
+
+    # Move out from MAP in both directions
+    # Stop once intervals contain "spread" of probability
+    MAP = find_MAP(data)
+    xMin = last(x[x.<MAP])
+    xMax = first(x[x.>MAP])
+    tot = 0.5*dx*(KDE.pdf(kdeObj,xMin)+KDE.pdf(kdeObj,xMax))
+    flag = false
+    while tot<spread
+        xMinN = xMin-dx
+        xMaxN = xMax+dx
+        if xMinN<0.0
+            flag = true
+            break
+        end
+        if KDE.pdf(kdeObj,xMinN)>KDE.pdf(kdeObj,xMaxN)
+            tot += 0.5*dx*(KDE.pdf(kdeObj,xMin)+KDE.pdf(kdeObj,xMinN))
+            xMin = xMinN
+        else
+            tot += 0.5*dx*(KDE.pdf(kdeObj,xMax)+KDE.pdf(kdeObj,xMaxN))
+            xMax = xMaxN
+        end
+    end
+
+    if flag
+        sort!(data)
+        idx = Int(round(spread*length(data)))
+        xMin = 0.0
+        xMax = data[idx]
+    end
+
+    return xMin,xMax
 
 end
 
