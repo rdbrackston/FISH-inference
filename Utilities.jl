@@ -38,6 +38,14 @@ end
 
 
 """
+Wrapper around the KDE function to ensure that all calls to KDE use the same settings
+"""
+function kde_wrpr(data)
+    KDE.kde(data, boundary=(0.0,2*max(data...)))
+end
+
+
+"""
 Function to compute the hypergeometric function using a Maclaurin series.
 Adapted from https://github.com/JuliaApproximation/SingularIntegralEquations.jl/src/HypergeometricFunctions/specialfunctions.jl
 Unused, as generally inferior to the GSL implemented version.

@@ -4,7 +4,6 @@ using RecipesBase, Reexport, Discretizers
 
 @reexport using Plots
 import Plots: _cycle
-import KernelDensity; const KDE = KernelDensity
 using Plots.PlotMeasures
 
 @userplot CorrPlot
@@ -13,25 +12,38 @@ using Plots.PlotMeasures
 """
 Function to plot the full chains and posterior distributions.
 """
-function plot_chain(chain)
+function plot_chain(chain, MAP=:none, Ints=:none)
 
 	nVar = size(chain)[2]
 	plots = Array{Any,1}(undef,nVar*2)
+
+    # Set MAP to the mean if not provided
+    if isequal(MAP,:none)
+        MAP = mean(chain,dims=1)
+        lbl = "Mean"
+    else
+        lbl = "MAP"
+    end
+
 
 	for ii=1:nVar
 		plots[ii] = plot(chain[:,ii], legend=false, title=Printf.@sprintf("Parameter %i",ii));
 
 		smpls = chain[:,ii]
-		kdeObj = KDE.kde(smpls)
+		kdeObj = kde_wrpr(smpls)
 		x = collect(range(Base.minimum(smpls),stop=Base.maximum(smpls),length=100))
 		y = map(z->KDE.pdf(kdeObj,z),x)
 		if ii ==1
 			tmp = plot(x,y, label="Posterior", legend=:top);
-			plot!(tmp, [mean(chain,dims=1)[ii],mean(chain,dims=1)[ii]],[0,Base.maximum(y)], label="Mean");
+			plot!(tmp, [MAP[ii],MAP[ii]],[0,Base.maximum(y)], label=lbl, line=(2,:black));
 		else
 			tmp = plot(x,y, legend=false);
-			plot!(tmp, [mean(chain,dims=1)[ii],mean(chain,dims=1)[ii]],[0,Base.maximum(y)]);
+			plot!(tmp, [MAP[ii],MAP[ii]],[0,Base.maximum(y)], line=(2,:black));
 		end
+        if !isequal(Ints,:none)
+            plot!(tmp, [Ints[ii][1],Ints[ii][1]],[0,Base.maximum(y)], line=(2,:black,:dash), label="");
+            plot!(tmp, [Ints[ii][2],Ints[ii][2]],[0,Base.maximum(y)], line=(2,:black,:dash), label="");
+        end
 		plots[ii+nVar] = tmp;
 
 	end
