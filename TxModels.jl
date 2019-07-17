@@ -4,6 +4,9 @@ module TxModels
 
 using Distributions, CSV, DataFrames, Plots, Optim, DifferentialEquations
 import LinearAlgebra, GSL, Printf, Base.Threads, Random, Future, SparseArrays, SpecialFunctions, DelimitedFiles
+import KernelDensity; const KDE = KernelDensity
+using .MathConstants: γ
+
 export TelegraphDist
 
 include("ModelInference.jl")
@@ -40,6 +43,11 @@ function samplecompound(parameters::AbstractArray, hyperParameters::AbstractArra
         lossFunc = prms->trunc_norm_loss(prms,m,v)
         res = optimize(lossFunc, [m,sqrt(v)]).minimizer
         parDistribution = TruncatedNormal(res[1],res[2], 0.0,Inf)
+
+    elseif isequal(mixDist,:Gumbel)
+        β = sqrt(6*v)/π
+        μ = m - β*γ
+        parDistribution = Truncated(Gumbel(μ,β),0.0,Inf)
 
     else
         error("Mixing distribution not recognised.
