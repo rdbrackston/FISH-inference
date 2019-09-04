@@ -1,6 +1,5 @@
 # Functions associated with defining a samplable probability distribution for the Telegraph model.
 
-
 """
 Telegraph model distribution Type.
 """
