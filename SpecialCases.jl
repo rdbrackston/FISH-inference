@@ -64,6 +64,7 @@ function log_poisson(parameters::AbstractArray, N::Integer; lTheta::Integer=200,
 
     # Initialize arrays
     thetMax = invlogcdf(parDist, log(cdfMax))
+    thetMax = max(thetMax,Float64(N))
     thetVec = collect(range(0.0,stop=thetMax,length=lTheta))
     thetVec = thetVec[2:end]
     PVec = Array{Array{Float64},1}(undef,length(thetVec))
@@ -97,7 +98,7 @@ end
 Function to the return a Compound negative bimomial distribution
 """
 function comp_negbinom(parameters::AbstractArray, N::Integer; lTheta::Integer=200,
-                       distFunc::Symbol=:Gamma, cdfMax::AbstractFloat=0.999)
+                       distFunc::Symbol=:LogNormal, cdfMax::AbstractFloat=0.999)
 
     # Parameters and distribution
     m = parameters[1]
@@ -111,6 +112,7 @@ function comp_negbinom(parameters::AbstractArray, N::Integer; lTheta::Integer=20
         θ = v/m
         k = m^2/v
         if k<1 # Parameters entering the negative binomial must be positive
+            println("Warning, Gamma distribution has probability at zero. Aborting.")
             return zeros(N)
         end
         parDist = Gamma(k,θ)
