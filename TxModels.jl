@@ -355,7 +355,7 @@ function solvemaster2(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
         end
     end
 
-    return P
+    return P./sum(P)
     
 end
 
