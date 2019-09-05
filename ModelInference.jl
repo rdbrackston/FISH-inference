@@ -57,7 +57,7 @@ function load_data(File1::String, File2::String, Folder::String, cutOff1::Float6
     data1Filt = [data1[ii] for ii=1:L if !isnan(data1[ii]) && !isnan(data2[ii]) && data1[ii]<cutOff1 && data2[ii]<cutOff2]
     data2Filt = [data2[ii] for ii=1:L if !isnan(data1[ii]) && !isnan(data2[ii]) && data1[ii]<cutOff1 && data2[ii]<cutOff2]
 
-    return data1Filt, data2Filt
+    return Int.(round.(data1Filt)), Int.(round.(data2Filt))
 
 end
 
