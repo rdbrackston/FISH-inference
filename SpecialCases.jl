@@ -162,3 +162,48 @@ function comp_negbinom(parameters::AbstractArray, N::Integer; lTheta::Integer=20
     Q = Q./sum(Q)    # Normalize
 
 end
+
+
+"""
+Calculate the contributions to the variance of the intrinsic and extrinsic noise.
+Currently implemented only for the compound negative binomial model.
+"""
+function contributions(parameters::AbstractArray, N::Integer;
+                        lTheta::Integer=200, cdfMax::AbstractFloat=0.999)
+
+    # Parameters and distribution
+    m = parameters[1]
+    p = parameters[2]
+    v = parameters[3]^2
+
+    # Evaluate mean and variance for compound distribution
+    d = TxModels.comp_negbinom(parameters,N, distFunc=:LogNormal,lTheta=lTheta,cdfMax=cdfMax)
+    E = LinAlg.dot(collect(0:length(d)-1),d)
+    V = LinAlg.dot((collect(0:length(d)-1).-E).^2,d)
+
+    # Set up extrinsic distribution
+    dE = LogNormal(log(m/sqrt(1+v/m^2)),sqrt(log(1+v/m^2)))
+    thetMax = invlogcdf(dE, log(cdfMax))
+    thetVec = collect(range(0.0,stop=thetMax,length=lTheta))
+
+    # Evaluate intrinsic contribution: E[Var[x|e]]
+    Vi = 0.0
+    for thet in thetVec[2:end]
+        tmp = NegativeBinomial(thet,p)
+        Vi += var(tmp)*Distributions.pdf(dE,thet)
+    end
+    Vi *= diff(thetVec)[1]
+
+    # Evaluate extrinsic contribution: Var[E[x|e]]
+    Ve = 0.0
+    for thet in thetVec[2:end]
+        tmp = NegativeBinomial(thet,p)
+        Ve += (mean(tmp)-E)^2*Distributions.pdf(dE,thet)
+    end
+    Ve *= diff(thetVec)[1]
+    println(Printf.@sprintf("Extrinsic contribution of %.1f%%.", 100*Ve/(Vi+Ve)))
+
+    return Vi,Ve
+
+end
+

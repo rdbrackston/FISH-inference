@@ -5,6 +5,7 @@ module TxModels
 using Distributions, CSV, DataFrames, Plots, Optim, DifferentialEquations
 import LinearAlgebra, GSL, Printf, Base.Threads, Random, Future, SparseArrays, SpecialFunctions, DelimitedFiles
 import KernelDensity; const KDE = KernelDensity
+import LinearAlgebra; const LinAlg = LinearAlgebra
 using .MathConstants: γ
 
 export TelegraphDist
