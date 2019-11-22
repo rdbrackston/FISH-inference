@@ -526,7 +526,6 @@ function solvemaster_full(parameters, N)
     for n=0:N-1
     	for r=0:n
     		if r>Max && (n-r)>Max
-    			println(n)
     			P[n+1] +=  big(ℯ*K₁/(n-r))^(n-r) * big(ℯ*(K₀-K₁)/r)^r * GSL.hypergeom(ν+r,λ+ν+r,K₁-K₀) * 
     					   fracrise(ν,ν+λ,r) * ℯ^(-K₁)  / (2π * sqrt(r*(n-r)))
     		else
