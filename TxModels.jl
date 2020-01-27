@@ -15,6 +15,7 @@ include("PlotUtils.jl")
 include("Distribution.jl")
 include("Utilities.jl")
 include("SpecialCases.jl")
+include("Recurrence.jl")
 
 
 """
