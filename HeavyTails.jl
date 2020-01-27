@@ -21,13 +21,13 @@ function meanexcess(X; L=1000)
 		eVec[ii] = mean(samps.-u)
 	end
 
-	plot(uVec,eVec, xlabel="Threshold, u",ylabel="Mean excess, e(u)", label="")
+	plt = plot(uVec,eVec, xlabel="Threshold, u",ylabel="Mean excess, e(u)", label="", line=0,marker=(2,))
 	# plot!([mean(X),mean(X)], [min(eVec...),max(eVec...)], line=:black)
 
 	m,b = ls_fit(uVec[uVec.>mean(X)],eVec[uVec.>mean(X)])
 	plot!(uVec[uVec.>mean(X)],z->m*z+b, line=:black, label="Least squares fit")
 
-	return uVec,eVec,m
+	return uVec,eVec,m,plt
 
 end
 function ls_fit(x,y)

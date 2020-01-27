@@ -157,7 +157,8 @@ Correlation plot recipe
 
     link := :x  # need custom linking for y
     layout := (n,n)
-    size := (1200,1200)
+    size := (600,600)
+    dpi := 300
     legend := false
     foreground_color_border := nothing
     margin := 1mm
@@ -165,6 +166,7 @@ Correlation plot recipe
     fillcolor --> Plots.fg_color(plotattributes)
     linecolor --> Plots.fg_color(plotattributes)
     markeralpha := 0.4
+    markersize := 2
     grad = cgrad(get(plotattributes, :markercolor, cgrad()))
     indices = reshape(1:n^2, n, n)'
     title = get(plotattributes,:title,"")
