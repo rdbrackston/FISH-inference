@@ -4,7 +4,18 @@
 Compute leaky gene distribution via the recurrence method.
 Compute up to copy number N with M terms in the recursion
 """
-function recurrence(prms, N, M)
+function solvemaster_rec(prms, N, M)
+
+	G = genfunc(prms, M)
+
+	return [invgenfunc(G, n) for n=0:(N-1)]
+
+end
+
+"""
+Evaluate the generating function G(z)
+"""
+function genfunc(prms, M)
 
 	# Set up parameters
 	λ = BigFloat(prms[3])
@@ -18,7 +29,7 @@ function recurrence(prms, N, M)
 	    b = BigFloat((n + ν) / ν)
 	    return BigFloat((1 / a) * ((b * K₀ * x) + (K₁ * y)))
 	end
-	function gg1(n, x, y) #calculate interates for g_0
+	function gg1(n, x, y) #calculate interates for g_1
 	    c = BigFloat((((n + ν) * (n + λ)) / λ) - ν)
 	    d = BigFloat((n + λ) / λ)
 	    return BigFloat((1 / c) * ((d * K₁ * y) + (K₀ * x)))
@@ -33,32 +44,74 @@ function recurrence(prms, N, M)
 	    KK[n] = gg1(n-1, LL[n-1], KK[n-1]) #calculates iterates for g1
 	end
 	G = LL .+ KK
-	println("Calculated generating functions")
 
-	function riser(x,n)  #nth rise of x divided by n!
-	    p = BigFloat(1)
-	    for i in 0:(n - 1)
-	        # t = BigFloat(x + i)
-	        p = p * BigFloat(x + i) / (i + 1)
-	    end
-	    return p
-	end
-	# Only obvious way to reduce cost is to stop iteration in k once s has converged
-	function q(n) #function for computing the steady-state solution
-	    s = BigFloat(0)
-	    for k in 0:M-N-1
-	        i = n + k
-	        ds = (G[i + 1] * (-1)^(k) * riser(k+1,n))
-	        # if isequal(n,40); println(ds/s); end
-	        abs(ds/s)<0.01 && break
-	        s += ds
-	    end
-	    return s
-	end
-
-	# Back-calculate distribution from generating functions
-	P = [q(n) for n=0:(N-1)]
-	return P
+	return G
 
 end
 
+"""
+Back-calculate the distribution from the generating function
+"""
+function invgenfunc(G, n)
+
+	M = length(G)
+
+	s = BigFloat(0)
+    for k in 0:M-n
+        i = n + k
+        ds = G[i + 1] * (-1)^(k)
+        ds *= factorial(big(k+n)) / (factorial(big(k))*factorial(big(n)))
+        abs(ds/s)<0.01 && break
+        s += ds
+    end
+    return Float64(s)	
+
+end
+
+
+"""
+Evaluate the generating function for a compound distribution
+"""
+function genfunc_compound(parameters::AbstractArray, hyperParameters::AbstractArray,
+                       distFunc::Symbol, M::Integer, parIndex=1; lTheta::Integer=200,
+                       cdfMax::AbstractFloat=0.999)
+
+	# Choose mixing distribution. The mean and variance are identical from case to case.
+    m = parameters[parIndex[1]]
+    v = hyperParameters[1]^2
+    if isequal(distFunc,:LogNormal)
+        parDistribution = LogNormal(log(m/sqrt(1+v/m^2)),sqrt(log(1+v/m^2)))
+
+    elseif isequal(distFunc,:Gamma)
+        θ = v/m
+        k = m^2/v
+        parDistribution = Gamma(k,θ)
+
+    elseif isequal(distFunc,:Normal)
+        lossFunc = prms->trunc_norm_loss(prms,m,v)
+        res = optimize(lossFunc, [m,sqrt(v)]).minimizer
+        parDistribution = TruncatedNormal(res[1],res[2], 0.0,Inf)
+
+    else
+        error("Mixing distribution not recognised.
+               Current options are LogNormal, Gamma and (Truncated) Normal")
+    end
+
+    # Find the value of theta at which the CDF reaches cdfMax
+    thetMax = invlogcdf(parDistribution, log(cdfMax))
+    thetVec = collect(range(0.0,stop=thetMax,length=lTheta))
+    dThet = thetVec[2]-thetVec[1]
+    thetVec = thetVec[2:end]
+    GVec = zeros(BigFloat,M)
+    parMod = deepcopy(parameters)
+
+    # Evaluate generating function for each theta and add contribution
+    for (ii,thet) in enumerate(thetVec)
+    	parMod[parIndex] = thet
+    	GVec .+= genfunc(parMod,M) .* Distributions.pdf(parDistribution,thet)
+    end
+    GVec .*= dThet
+
+    return GVec
+
+end
