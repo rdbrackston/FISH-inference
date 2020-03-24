@@ -51,7 +51,7 @@ Adapted from https://github.com/JuliaApproximation/SingularIntegralEquations.jl/
 Unused, as generally inferior to the GSL implemented version.
 """
 function hypergeom1F1(a::Float64,b::Float64,z::Float64)
-    
+
     S₀,S₁,err,j = 1.0,1.0+a*z/b,1.0,1
     while err > 1eps(Float64)
         rⱼ = inv(j+1.0)
@@ -62,4 +62,16 @@ function hypergeom1F1(a::Float64,b::Float64,z::Float64)
         j+=1
     end
     return S₁
+end
+
+
+"""
+Fraction of rising factorials, as used in a number of other functions.
+"""
+function fracrise(x, y, r)
+	Q = 1
+	for m=0:r-1
+		Q *= (x + m) / (y + m)
+	end
+	return Q
 end
