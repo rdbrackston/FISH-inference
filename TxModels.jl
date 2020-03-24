@@ -3,12 +3,18 @@
 module TxModels
 
 using Distributions, CSV, DataFrames, Plots, Optim, DifferentialEquations
-import LinearAlgebra, GSL, Printf, Base.Threads, Random, Future, SparseArrays, SpecialFunctions, DelimitedFiles
+import LinearAlgebra, GSL, Base.Threads, Random, Future, SparseArrays, SpecialFunctions, DelimitedFiles
 import KernelDensity; const KDE = KernelDensity
 import LinearAlgebra; const LinAlg = LinearAlgebra
+import Combinatorics: stirlings1
+import Printf: @sprintf
 using .MathConstants: γ
+import Base: rand
+import Random: AbstractRNG
 
-export TelegraphDist
+export TelegraphDist,
+    solvemaster,
+    maxentropyestimation
 
 include("ModelInference.jl")
 include("PlotUtils.jl")
@@ -16,11 +22,12 @@ include("Distribution.jl")
 include("Utilities.jl")
 include("SpecialCases.jl")
 include("Recurrence.jl")
+include("extrinsicinference.jl")
 
 
 """
 Function to draw many samples from one of the special case compound distributions.
-Valid if the underlying gene expression is either constitutive (poisson) or 
+Valid if the underlying gene expression is either constitutive (poisson) or
 extremely bursty (NegataveBinomial).
 """
 function samplecompound(parameters::AbstractArray, hyperParameters::AbstractArray,
@@ -107,7 +114,7 @@ function solvecompound(parameters::AbstractArray, hyperParameters::AbstractArray
                        distFunc::Symbol, parIndex=[1]; lTheta::Integer=200,
                        cdfMax::AbstractFloat=0.999, N::Union{Symbol,Integer}=:auto,
                        verbose=false, method=:fast)
-    
+
     # Choose mixing distribution. The mean and variance are identical from case to case.
     m = parameters[parIndex[1]]
     v = hyperParameters[1]^2
@@ -146,13 +153,15 @@ function solvecompound(parameters::AbstractArray, hyperParameters::AbstractArray
     	else
     		if isequal(method,:fast)
         		PVec[ii] = solvemaster(parMod, N, verbose)
+            elseif isequal(method,:FSP)
+                PVec[ii] = solvemaster_matrix(parMod, N, verbose)
         	else
         		PVec[ii] = solvemaster2(parMod, N, verbose)
         	end
         end
         L = max(L,length(PVec[ii])-1)
     end
-    
+
     # Pad all Ps with zeros to make of equal length (N+1)
     for ii=1:length(PVec)
         l = length(PVec[ii])
@@ -160,7 +169,7 @@ function solvecompound(parameters::AbstractArray, hyperParameters::AbstractArray
             PVec[ii] = [PVec[ii];eps(Float64)*ones(Float64,L+1-l)]
         end
     end
-    
+
     Q = zeros(Float64, L+1)
     # Loop over all the values of n
     for ii=1:length(Q)
@@ -174,7 +183,7 @@ function solvecompound(parameters::AbstractArray, hyperParameters::AbstractArray
 
     end
     Q = Q./sum(Q)    # Normalize
-    
+
 end
 
 
@@ -319,7 +328,7 @@ function solvemaster2(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
     δ = 1.0
     E = λ*K/(λ+ν)/δ    # Mean
     V = λ*K/(λ+ν)/δ + λ*ν*K^2/((λ+ν)^2)/(λ+ν+δ)/δ    # Variance
-    
+
     # Rule of thumb for maximum number of mRNA with non-negligible probability
     Nguess = Int(round(E+5*sqrt(V)))
     if N==:auto
@@ -358,7 +367,7 @@ function solvemaster2(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
     end
 
     return P./sum(P)
-    
+
 end
 
 
@@ -369,7 +378,7 @@ n a number much larger than k.
 
 Based on code copyright John W. Pearson 2014
 """
-function hypfun_rec_miller(a::Float64,b::Float64,z::Float64,k::Int64, n=:auto, sol=:none)
+function hypfun_rec_miller(a::AbstractFloat,b::AbstractFloat,z::AbstractFloat,k::Integer, n=:auto, sol=:none)
 
     if n==:auto
         n = Int(50*k)
@@ -420,7 +429,7 @@ function solvemaster(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
 	    δ = 1.0
 	    E = λ*K₁/(λ+ν)/δ    # Mean
 	    V = λ*K₁/(λ+ν)/δ + λ*ν*K₁^2/((λ+ν)^2)/(λ+ν+δ)/δ    # Variance
-	    
+
 	    # Rule of thumb for maximum number of mRNA with non-negligible probability
 	    Nguess = Int(round(E+5*sqrt(V)))
 	    if N==:auto
@@ -439,7 +448,7 @@ function solvemaster(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
 	    δ = 1.0
 	    E = λ*K/(λ+ν)/δ    # Mean
 	    V = λ*K/(λ+ν)/δ + λ*ν*K^2/((λ+ν)^2)/(λ+ν+δ)/δ    # Variance
-	    
+
 	    # Rule of thumb for maximum number of mRNA with non-negligible probability
 	    Nguess = Int(round(E+5*sqrt(V)))
 	    if N==:auto
@@ -496,7 +505,7 @@ function solvemaster(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
 	    P = P./sum(P)
 	    return P
 	end
-    
+
 end
 
 
@@ -505,35 +514,52 @@ Function to evaluate the analytical distribution for the leaky gene expression m
 Called by solvemaster for cases in which parameters has length four.
 !! Has numerical stability issues for large n, solution is work in progress !!
 """
-function fracrise(x, y, r)
-	Q = 1
-		for m=0:r-1
-			Q *= (x + m) / (y + m)
-		end
-	return Q
-end
-
 function solvemaster_full(parameters, N)
 
 	# Assign the parameters
-	λ = parameters[3]
-	ν = parameters[4]
-	K₀ = parameters[1]
-	K₁ = parameters[2]
-    δ = 1.0
+	λ = big(parameters[3])
+    ν = big(parameters[4])
+    K₀ = big(parameters[1])
+    K₁ = big(parameters[2])
 
-	P = zeros(N)
+	P = zeros(BigFloat,N)
 	Max = 150
     for n=0:N-1
     	for r=0:n
     		if r>Max && (n-r)>Max
-    			P[n+1] +=  big(ℯ*K₁/(n-r))^(n-r) * big(ℯ*(K₀-K₁)/r)^r * GSL.hypergeom(ν+r,λ+ν+r,K₁-K₀) * 
+                # Evaluate using Stirling's approximation
+    			P[n+1] +=  big(ℯ*K₁/(n-r))^(n-r) * big(ℯ*(K₀-K₁)/r)^r * GSL.hypergeom(ν+r,λ+ν+r,K₁-K₀) *
     					   fracrise(ν,ν+λ,r) * ℯ^(-K₁)  / (2π * sqrt(r*(n-r)))
     		else
-    			P[n+1] += big(K₁)^(n-r) * big(K₀-K₁)^r * GSL.hypergeom(ν+r,λ+ν+r,K₁-K₀) * 
-    					  fracrise(ν,ν+λ,r) * ℯ^(-K₁) / (factorial(big(n-r)) * factorial(big(r)))	
+    			P[n+1] += K₁^big(n-r) * (K₀-K₁)^big(r) * big(GSL.hypergeom(ν+r,λ+ν+r,K₁-K₀)) *
+    					  fracrise(ν,ν+λ,r) * exp(-K₁) / (factorial(big(n-r)) * factorial(big(r)))
     		end
     	end
+    end
+
+    P = P./sum(P)
+
+end
+function solvemaster_full2(parameters, N)
+
+    # Assign the parameters
+    λ = big(parameters[3])
+    ν = big(parameters[4])
+    K₀ = big(parameters[1])
+    K₁ = big(parameters[2])
+
+    P = zeros(BigFloat,N)
+    for n=0:N-1
+        F = GSL.hypergeom(ν,λ+ν,K₁-K₀)
+        F = big(F)
+        P[n+1] += K₁^big(n) * F * exp(-K₁) / factorial(big(n))
+        for r=1:n
+            # M = max(5,Int(round(100*r)))
+            M = 500
+            F = hypfun_rec_miller(ν+r-1,λ+ν+r-1,K₁-K₀,1,M,F)
+            P[n+1] += K₁^big(n-r) * (K₀-K₁)^r * F * fracrise(ν,ν+λ,r) *
+                exp(-K₁) / (factorial(big(n-r)) * factorial(big(r)))
+        end
     end
 
     P = P./sum(P)
@@ -546,7 +572,7 @@ Function to solve the master equation at steady state, returning the probability
 Uses exclusively the nullspace method.
 """
 function solvemaster_matrix(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
-    
+
     if verbose
     	Printf.@printf("Solving master equation via the matrix method.\n")
     end
@@ -570,18 +596,18 @@ function solvemaster_matrix(parameters, N=:auto::Union{Symbol,Int64}, verbose=fa
 	δ = 1.0
     E = λ*K₁/(λ+ν)/δ    # Mean
     V = λ*K₁/(λ+ν)/δ + λ*ν*K₁^2/((λ+ν)^2)/(λ+ν+δ)/δ    # Variance
-    
+
     if N==:auto
         # Rule of thumb for maximum number of mRNA with non-negligible probability
         N = Int(round(E+5*sqrt(V)))
     end
 
     A = A_matrix(K₀,K₁,λ,ν,δ, N)
-    
+
     P = LinearAlgebra.nullspace(A)
     P = abs.(P[1:N] + P[N+1:end])
     P = P./sum(P)
-    
+
 end
 
 
