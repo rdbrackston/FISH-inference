@@ -36,6 +36,56 @@ function genpdf(data::Array{Int64,1}, nbin=:auto::Union{Int,Symbol})
 
 end
 
+"""
+Generate a normalized pdf from continuous data.
+"""
+function genkde(smpls)
+
+    data = deepcopy(smpls)
+    filter!(x -> !isnan(x), data)    # Remove nans from data
+
+    kdeObj = KDE.kde(data)
+    x = collect(range(minimum(data),stop=maximum(data),length=100))
+    y = map(z->KDE.pdf(kdeObj,z),x)
+
+    return (x,y)
+
+end
+
+
+"""
+Generate a normalized pdf using a transform-retransform approach.
+"""
+function genkde_trans(smpls, Tfunc=:log::Symbol)
+
+    if isequal(Tfunc,:log)
+        T = z->log(z+1.)
+        dT = z->1/(z+1.)
+    elseif isequal(Tfunc, :arctan)
+        T = z->2*atan(z)/pi
+        dT = z->2/(pi*(z^2+1.))
+    end
+
+    X = deepcopy(smpls)
+    filter!(z -> !isnan(z), X)    # Remove nans from data
+    Y = T.(X)
+    # Y = log.(X .+ 1.)
+
+    # Perform KDE on log-transformed data
+    kdeObj = KDE.kde(Y)
+    x = collect(range(0.0, stop=1.05*maximum(X), length=1000))
+    y = T.(x)
+    # y = log.(x .+ 1.)
+    g = map(z->KDE.pdf(kdeObj,z),y)
+
+    # Retransform
+    f = g.*dT.(x)
+    # f = g./(1. .+ x)
+
+    return (x,f)
+
+end
+
 
 """
 Wrapper around the KDE function to ensure that all calls to KDE use the same settings
