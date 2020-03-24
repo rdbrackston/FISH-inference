@@ -13,13 +13,13 @@ end
 """
 Definition of the rand function to draw samples from the model.
 """
-function rand(d::TelegraphDist)
+function rand(rng::AbstractRNG, d::TelegraphDist)
 
-	r = Base.rand()
+	r = Base.rand(rng)
 	s = quantile(d,r)
+	return s
 
 end
-Distributions.rand(d::TelegraphDist) = rand(d::TelegraphDist)
 
 
 """ Required by distributions. """
@@ -89,10 +89,10 @@ function quantile(d::TelegraphDist, q::Real)
 end
 
 """ Required by distributions. """
-# minimum(d::TelegraphDist) = 0
+minimum(d::TelegraphDist) = 0
 
 """ Required by distributions. """
-# maximum(d::TelegraphDist) = Inf
+maximum(d::TelegraphDist) = Inf
 
 """ Required by distributions. """
-# insupport(d::TelegraphDist, x::Real) = x>=0
+insupport(d::TelegraphDist, x::Real) = x>=0
