@@ -5,7 +5,7 @@ Function to evaluate the log-likelihood of the data, given the standard model
 with a particular set of parameters.
 """
 function log_likelihood_ZILP(parameters, data)
-    
+
     w = parameters[3]
     Nmax = Integer(round(Base.maximum(data)))    # Maximum value in the data
     P = log_poisson(parameters[1:2],Nmax+1)
@@ -16,13 +16,13 @@ function log_likelihood_ZILP(parameters, data)
     countVec = collect(0:max(N,Nmax))
     Pfull = zeros(Float64, size(countVec))
     Pfull[1:N] = P
-    
+
     idx = Integer.(round.(data)) .+ 1
     filter!(x -> x>0, idx)
     lVec = Pfull[idx]
-    
+
     return sum(log.(lVec))
-    
+
 end
 
 
@@ -31,7 +31,7 @@ Function to evaluate the log-likelihood of the data, given the standard model
 with a particular set of parameters.
 """
 function log_likelihood_compNB(parameters, data)
-    
+
     Nmax = Integer(round(Base.maximum(data)))    # Maximum value in the data
     P = comp_negbinom(parameters,Nmax+1)
 
@@ -39,13 +39,13 @@ function log_likelihood_compNB(parameters, data)
     countVec = collect(0:max(N,Nmax))
     Pfull = zeros(Float64, size(countVec))
     Pfull[1:N] = P
-    
+
     idx = Integer.(round.(data)) .+ 1
     filter!(x -> x>0, idx)
     lVec = Pfull[idx]
-    
+
     return sum(log.(lVec))
-    
+
 end
 
 
@@ -71,12 +71,12 @@ function log_poisson(parameters::AbstractArray, N::Integer; lTheta::Integer=200,
 
     # Loop over the hyperparameter vector
     for (ii,thet) in enumerate(thetVec)
-        
+
         d = Poisson(thet)
         PVec[ii] = [Distributions.pdf(d,x) for x=0:N-1]
-        
+
     end
-    
+
     Q = zeros(Float64, N)
     # Loop over all the values of n
     for ii=1:N
@@ -135,7 +135,7 @@ function comp_negbinom(parameters::AbstractArray, N::Integer; lTheta::Integer=20
 
     # Loop over the hyperparameter vector
     for (ii,thet) in enumerate(thetVec)
-        
+
         if !(thet>0)
             println(thet)
             println(m)
@@ -144,9 +144,9 @@ function comp_negbinom(parameters::AbstractArray, N::Integer; lTheta::Integer=20
 
         d = NegativeBinomial(thet,p)
         PVec[ii] = [Distributions.pdf(d,x) for x=0:N-1]
-        
+
     end
-    
+
     Q = zeros(Float64, N)
     # Loop over all the values of n
     for ii=1:N
@@ -201,9 +201,7 @@ function contributions(parameters::AbstractArray, N::Integer;
         Ve += (mean(tmp)-E)^2*Distributions.pdf(dE,thet)
     end
     Ve *= diff(thetVec)[1]
-    println(Printf.@sprintf("Extrinsic contribution of %.1f%%.", 100*Ve/(Vi+Ve)))
-
+    
     return Vi,Ve
 
 end
-
