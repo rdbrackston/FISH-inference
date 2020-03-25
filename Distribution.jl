@@ -35,18 +35,13 @@ function pdf(d::TelegraphDist, n::Int)
     b = d.λ+d.ν
     c = d.K
 
-    # try # Hypergeom1F1 fails for some argument values
-		P = c^n * GSL.hypergeom(a+n,b+n,-c)/factorial(big(n))
-    	if Base.isinf(P)    # Use Stirling's approximation for n!
-    		P = GSL.hypergeom(a+n,b+n,-c) * (c*ℯ/n)^n / sqrt(2*n*pi)
-    	end
-        for m=0:n-1
-            P *= (a+m)/(b+m)
-        end
-    #catch
-    #	P = 0.0
-     #   failed = true
-	#end
+    P = c^n * GSL.hypergeom(a+n,b+n,-c)/factorial(big(n))
+	if Base.isinf(P)    # Use Stirling's approximation for n!
+		P = GSL.hypergeom(a+n,b+n,-c) * (c*ℯ/n)^n / sqrt(2*n*pi)
+	end
+    for m=0:n-1
+        P *= (a+m)/(b+m)
+    end
 
 	return P
 
@@ -87,12 +82,3 @@ function quantile(d::TelegraphDist, q::Real)
 	return n-1
 
 end
-
-""" Required by distributions. """
-# minimum(d::TelegraphDist) = 0
-
-""" Required by distributions. """
-# maximum(d::TelegraphDist) = Inf
-
-""" Required by distributions. """
-# insupport(d::TelegraphDist, x::Real) = x>=0
