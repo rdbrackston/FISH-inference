@@ -12,9 +12,19 @@ using .MathConstants: γ
 import Base: rand
 import Random: AbstractRNG
 
-export TelegraphDist,
+export # Types
+    TelegraphDist,
+
+    # Methods
+    genkde,
+    genkde_trans,
+    genpdf,
+    maxentropyestimation,
+    samplecompound,
+    solvecompound,
     solvemaster,
-    maxentropyestimation
+    solvemaster_fsp,
+    solvemaster_rec
 
 include("inference.jl")
 include("plotutils.jl")

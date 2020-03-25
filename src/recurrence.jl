@@ -4,21 +4,10 @@
 Compute leaky gene distribution via the recurrence method.
 Compute up to copy number N with M terms in the recursion
 """
-function rec_twostate(prms, N, M)
+function solvemaster_rec(prms, N, M)
 
 	G = genfunc_twostate(prms, M)
 	return [invgenfunc(G, n) for n=0:(N-1)]
-
-end
-
-"""
-Compute leaky gene distribution via the recurrence method.
-Compute up to copy number N with M terms in the recursion
-"""
-function rec_threestate(prms, N, M)
-
-    G = genfunc_threestate(prms, M)
-    return [invgenfunc(G, n) for n=0:(N-1)]
 
 end
 
@@ -56,70 +45,6 @@ function genfunc_twostate(prms, M)
 	G = LL .+ KK
 
 	return G
-
-end
-
-
-"""
-Evaluate the generating function G(z)
-"""
-function genfunc_threestate(prms, M)
-
-    # Set up parameters
-    v12 = BigFloat(prms[1])
-    v21 = BigFloat(prms[2])
-    v13 = BigFloat(prms[3])
-    v31 = BigFloat(prms[4])
-    v23 = BigFloat(prms[5])
-    v32 = BigFloat(prms[6])
-    k1 = BigFloat(prms[7])
-    k2 = BigFloat(prms[8])
-    k3 = BigFloat(prms[9])
-
-    # Determinent like function
-    function d(n)
-        return (n^BigFloat(2) + n*(v12 + v13 + v21 + v23 + v31 + v32) + 
-        v12*(v23 + v31 + v32) + v13*(v21 + v23 + v32) + v21*(v31 + v32) + v23*v31)
-    end
-
-    # Recursive updater
-    function update(nn, ss)
-        n = BigFloat(nn)
-        up = Array{BigFloat}(undef, 3)
-        for i in 1:3
-            aa = [1,2,3]
-            filter!(x->!isequal(x,i),aa)
-            j = aa[1]
-            k = aa[2]
-
-            up[i] = kvec[j]*ss[j]*(BigFloat(n)*vvec[j, i] + vvec[j, k]*vvec[k, i] + vvec[j, i]*(vvec[k, i] + vvec[k, j]))
-                + kvec[k]*ss[k]*(BigFloat(n)*vvec[k, i] + vvec[j, k]*vvec[k, i] + vvec[j, i]*(vvec[k, i] + vvec[k, j]))
-                + kvec[i]*ss[i]*(BigFloat(n^2) + vvec[j, i]*vvec[k, i] + vvec[j, k]*vvec[k, i] + vvec[j, i]*vvec[k, j]
-                + BigFloat(n)*(vvec[j, i] + vvec[j, k] + vvec[k, i] + vvec[k, j]))
-
-            up[i] *= BigFloat(1)/(n*d(n))
-        end
-        return up
-    end
-
-    # Useful arrays
-    vvec = [0 v12 v13; v21 0 v23; v31 v32 0]'
-    kvec = [k1, k2, k3]
-
-    # Initial condition
-    ini = [(vvec[2, 1]*vvec[3, 1] + vvec[2, 3]*vvec[3, 1] + vvec[2, 1]*vvec[3, 2])/d(0),
-            (vvec[1, 2]*vvec[3, 1] + vvec[1, 2]*vvec[3, 2] + vvec[1, 3]*vvec[3, 2])/d(0),
-            (vvec[1, 3]*vvec[2, 1] + vvec[1, 2]*vvec[2, 3] + vvec[1, 3]*vvec[2, 3])/d(0)]
-
-    # Evaluate the recursion
-    SS = Array{BigFloat,2}(undef,3,M)
-    SS[:,1] = ini
-    for n in 2:M
-        SS[:,n] = update(n-1, SS[:,n-1])
-    end
-    G = sum(SS,dims=1)
-
-    return G
 
 end
 

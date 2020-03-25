@@ -1,9 +1,14 @@
 """
-Function to solve the master equation at steady state, returning the probability
-mass function. Evaluation uses the recursive implementation of the hypergeometric
-function. This is slower but more robust than the GSL version.
+Function to solve the telegraph model master equation at steady state, returning
+the probability distribution. Evaluation uses the recursive implementation of
+the hypergeometric function. This is slower but more robust than the GSL version.
 """
-function solvemaster2(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
+function solvemaster_miller(parameters, N=:auto::Union{Symbol,Int64},
+		verbose=false)
+
+	if verbose
+		println("Solving telegraph model using the Miller method.")
+	end
 
     λ = parameters[2]
     ν = parameters[3]
@@ -96,14 +101,15 @@ Function to solve the master equation at steady state, returning the probability
 mass function. Evaluation uses the analytical expression for p(n) where possible
 before solving the matrix equation for the remaining higher values of n.
 """
-function solvemaster(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
-
-	if verbose
-    	@printf("Solving master equation via the combined method.\n")
-    end
+function solvemaster(parameters, N=:auto::Union{Symbol,Int64}, verbose=false,
+					method=:Miller)
 
  	# Call the full function if four parameters are included
     if length(parameters)==4
+
+        if verbose
+        	@printf("Solving master equation for leaky telegraph model.\n")
+        end
 
     	λ = parameters[3]
 		ν = parameters[4]
@@ -124,6 +130,10 @@ function solvemaster(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
 	    return solvemaster_full(parameters, N)
 
 	else
+
+		if method==:Miller
+			return solvemaster_miller(parameters,N,verbose)
+		end
 
 		λ = parameters[2]
 		ν = parameters[3]
@@ -193,37 +203,10 @@ end
 
 
 """
-Function to evaluate the analytical distribution for the leaky gene expression model.
+Function to evaluate the analytical distribution for the leaky telegraph model.
 Called by solvemaster for cases in which parameters has length four.
-!! Has numerical stability issues for large n, solution is work in progress !!
 """
 function solvemaster_full(parameters, N)
-
-	# Assign the parameters
-	λ = big(parameters[3])
-    ν = big(parameters[4])
-    K₀ = big(parameters[1])
-    K₁ = big(parameters[2])
-
-	P = zeros(BigFloat,N)
-	Max = 150
-    for n=0:N-1
-    	for r=0:n
-    		if r>Max && (n-r)>Max
-                # Evaluate using Stirling's approximation
-    			P[n+1] +=  big(ℯ*K₁/(n-r))^(n-r) * big(ℯ*(K₀-K₁)/r)^r * GSL.hypergeom(ν+r,λ+ν+r,K₁-K₀) *
-    					   fracrise(ν,ν+λ,r) * ℯ^(-K₁)  / (2π * sqrt(r*(n-r)))
-    		else
-    			P[n+1] += K₁^big(n-r) * (K₀-K₁)^big(r) * big(GSL.hypergeom(ν+r,λ+ν+r,K₁-K₀)) *
-    					  fracrise(ν,ν+λ,r) * exp(-K₁) / (factorial(big(n-r)) * factorial(big(r)))
-    		end
-    	end
-    end
-
-    P = P./sum(P)
-
-end
-function solvemaster_full2(parameters, N)
 
     # Assign the parameters
     λ = big(parameters[3])
@@ -237,7 +220,6 @@ function solvemaster_full2(parameters, N)
         F = big(F)
         P[n+1] += K₁^big(n) * F * exp(-K₁) / factorial(big(n))
         for r=1:n
-            # M = max(5,Int(round(100*r)))
             M = 500
             F = hypfun_rec_miller(ν+r-1,λ+ν+r-1,K₁-K₀,1,M,F)
             P[n+1] += K₁^big(n-r) * (K₀-K₁)^r * F * fracrise(ν,ν+λ,r) *

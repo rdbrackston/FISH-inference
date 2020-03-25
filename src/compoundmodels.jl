@@ -125,11 +125,9 @@ function solvecompound(parameters::AbstractArray, hyperParameters::AbstractArray
     			parIndex[2:end], lTheta=lTheta, cdfMax=cdfMax, N=N, method=method)
     	else
     		if isequal(method,:fast)
-        		PVec[ii] = solvemaster(parMod, N, verbose)
+        		PVec[ii] = solvemaster(parMod, N, verbose, method)
             elseif isequal(method,:FSP)
                 PVec[ii] = solvemaster_fsp(parMod, N, verbose)
-        	else
-        		PVec[ii] = solvemaster2(parMod, N, verbose)
         	end
         end
         L = max(L,length(PVec[ii])-1)
