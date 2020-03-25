@@ -16,12 +16,12 @@ export TelegraphDist,
     solvemaster,
     maxentropyestimation
 
-include("ModelInference.jl")
-include("PlotUtils.jl")
-include("Distribution.jl")
-include("Utilities.jl")
-include("SpecialCases.jl")
-include("Recurrence.jl")
+include("inference.jl")
+include("plotutils.jl")
+include("telegraphdistribution.jl")
+include("utilities.jl")
+include("specialcases.jl")
+include("recurrence.jl")
 include("extrinsicinference.jl")
 include("fsp.jl")
 include("analytic.jl")
