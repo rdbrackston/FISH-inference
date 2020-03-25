@@ -5,7 +5,7 @@ mass function. Uses the steady state finite state projection algorithm.
 function solvemaster_fsp(parameters, N=:auto::Union{Symbol,Int64}, verbose=false)
 
     if verbose
-    	Printf.@printf("Solving master equation via the matrix method.\n")
+    	@printf("Solving master equation via the matrix method.\n")
     end
 
     if length(parameters)==3

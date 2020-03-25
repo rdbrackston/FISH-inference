@@ -31,7 +31,7 @@ end
 
 
 """
-Function to load in two sets of experimental data, filtering out missings/NaNs 
+Function to load in two sets of experimental data, filtering out missings/NaNs
 from both sets together to maintain equal length.
 """
 function load_data(File1::String, File2::String, Folder::String, cutOff1::Float64=Inf, cutOff2::Float64=Inf)
@@ -67,7 +67,7 @@ Function to evaluate the log-likelihood of the data, given the standard model
 with a particular set of parameters.
 """
 function log_likelihood(parameters, data)
-    
+
     Nmax = Integer(round(Base.maximum(data)))    # Maximum value in the data
     P = solvemaster(parameters,Nmax+1)
     # P = solvemaster(parameters)
@@ -75,13 +75,13 @@ function log_likelihood(parameters, data)
     countVec = collect(0:max(N,Nmax))
     Pfull = zeros(Float64, size(countVec))
     Pfull[1:N] = P
-    
+
     idx = Integer.(round.(data)) .+ 1
     filter!(x -> x>0, idx)
     lVec = Pfull[idx]
-    
+
     return sum(log.(lVec))
-    
+
 end
 
 
@@ -90,20 +90,20 @@ Function to evaluate the log-likelihood of the data, given the compound model
 with a particular set of parameters.
 """
 function log_likelihood_compound(baseParams, distParams, distFunc, idx, data; lTheta::Integer=250, cdfMax::AbstractFloat=0.999)
-    
+
     Nmax = Integer(round(Base.maximum(data)))+1    # Maximum value in the data
     P = solvecompound(baseParams, distParams, distFunc, idx; N=Nmax, lTheta=lTheta, cdfMax=cdfMax)
     L = length(P)
     N = max(L,Nmax)    # P runs from zero to N-1
     countVec = collect(0:N)
     Pfull = [P...;eps(Float64)*ones(Float64,N-L+1)]
-    
+
     indcs = Integer.(round.(data)) .+ 1
     filter!(x -> x>0, indcs)
     lVec = Pfull[indcs]
-    
+
     return sum(log.(lVec))
-    
+
 end
 
 
@@ -125,7 +125,7 @@ function maximumlikelihood(x0, logPfunc, upper=:Auto, verbose=false)
     optPrms = Optim.minimizer(res)
 
     if verbose
-        println(Printf.@sprintf("AIC value of %.2f",-2*logPfunc(optPrms)+2*4))
+        println(@sprintf("AIC value of %.2f",-2*logPfunc(optPrms)+2*4))
     end
     return optPrms
 
@@ -139,7 +139,7 @@ function mcmc_metropolis(x0::AbstractArray, logPfunc::Function, Lchain::Integer;
                          propStd::Union{AbstractFloat,AbstractArray}=0.1,
                          step::Integer=500, burn::Integer=500, printFreq::Integer=10000,
                          prior=:none, verbose::Bool=true, scaleProp::Bool=true)
-    
+
 	if length(size(x0)) > 1 # restart from old chain
         if verbose; println("Restarting from old chain"); end
 		xOld = x0[end,:]
@@ -151,7 +151,7 @@ function mcmc_metropolis(x0::AbstractArray, logPfunc::Function, Lchain::Integer;
     chain = zeros(Float64, Lchain,n)
     chain[1,:] = xOld
     acc = 0
-    
+
     if prior == :none
     	logpOld = logPfunc(xOld)
     else
@@ -160,7 +160,7 @@ function mcmc_metropolis(x0::AbstractArray, logPfunc::Function, Lchain::Integer;
         	logpOld += log(Distributions.pdf(prr,xOld[ip]))
         end
     end
-    
+
     for ii=2:Lchain
         if scaleProp
             proposal = MvNormal(propStd.*xOld)
@@ -194,16 +194,16 @@ function mcmc_metropolis(x0::AbstractArray, logPfunc::Function, Lchain::Integer;
             acc += 1
         end
         chain[ii,:] = xOld
-        
+
         if ii % printFreq == 0
             if verbose
-                Printf.@printf("Completed iteration %i out of %i. \n", ii,Lchain)
+                @printf("Completed iteration %i out of %i. \n", ii,Lchain)
             end
         end
     end
-    
+
     if verbose
-        Printf.@printf("Acceptance ratio of %.2f (%i out of %i).\n", acc/Lchain,acc,Lchain)
+        @printf("Acceptance ratio of %.2f (%i out of %i).\n", acc/Lchain,acc,Lchain)
     end
 
 	if length(size(x0)) > 1
@@ -212,7 +212,7 @@ function mcmc_metropolis(x0::AbstractArray, logPfunc::Function, Lchain::Integer;
 		chainRed = chain[burn:step:end,:]
 	end
 	return chainRed
-    
+
 end
 
 
@@ -221,9 +221,9 @@ Function to perform the MCMC metropolis algorithm in parallel using multithreadi
 """
 function mcmc_metropolis_par(x0::AbstractArray, logPfunc::Function, Lchain::Integer;
                          prior=:none, propVar::AbstractFloat=0.1)
-    
+
     nChains = Threads.nthreads()
-    
+
     r = let m = Random.MersenneTwister(1)
         [m; accumulate(Future.randjump, fill(big(10)^20, nChains-1), init=m)]
     end
@@ -250,7 +250,7 @@ function mcmc_metropolis_par(x0::AbstractArray, logPfunc::Function, Lchain::Inte
 	    chains[ii] = zeros(Float64, Lchain,n)
 	    chains[ii][1,:] = xstarts[ii]
 	    xOld = xstarts[ii]
-	    
+
 	    if prior == :none
 			logpOld = logPfunc(xOld)
 		else
@@ -259,7 +259,7 @@ function mcmc_metropolis_par(x0::AbstractArray, logPfunc::Function, Lchain::Inte
 		    	logpOld += log(pdf(prr,xOld[ip]))
 		    end
 		end
-	    
+
 	    for jj=2:Lchain
             proposal = MvNormal(propVar.*xOld)
 	        xNew = xOld + Distributions.rand(r[Threads.threadid()], proposal)
@@ -289,15 +289,15 @@ function mcmc_metropolis_par(x0::AbstractArray, logPfunc::Function, Lchain::Inte
 	    end
 	end
 
-    Printf.@printf("Acceptance ratio of %.2f (%i out of %i).\n", acc[]/(Lchain*nChains),acc[],Lchain*nChains)
-    
+    @printf("Acceptance ratio of %.2f (%i out of %i).\n", acc[]/(Lchain*nChains),acc[],Lchain*nChains)
+
     if length(size(x0[1])) > 1
     	for ii=1:nChains
     		chains[ii] = [x0[ii];chains[ii]] # Append new chain to old
     	end
     end
     return chains
-    
+
 end
 
 

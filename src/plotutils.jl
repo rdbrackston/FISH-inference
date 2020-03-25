@@ -27,7 +27,7 @@ function plot_chain(chain, MAP=:none, Ints=:none)
 
 
 	for ii=1:nVar
-		plots[ii] = plot(chain[:,ii], legend=false, title=Printf.@sprintf("Parameter %i",ii));
+		plots[ii] = plot(chain[:,ii], legend=false, title=@sprintf("Parameter %i",ii));
 
 		smpls = chain[:,ii]
 		kdeObj = kde_wrpr(smpls)
@@ -64,7 +64,7 @@ function plot_chain(chain, MAP=:none, Ints=:none)
 		plt = plot(plots[1],plots[2],plots[3],plots[4],plots[5],plots[6],plots[7],plots[8],plots[9],plots[10],plots[11],plots[12],
 			       layout=(2,nVar), size=(2400,800))
 	else
-		Printf.@printf("nVar of %i not currently catered for.", nVar)
+		@printf("nVar of %i not currently catered for.", nVar)
 		plt = plot()
 	end
 
@@ -217,7 +217,7 @@ Correlation plot recipe
                         if iseven(n)
                             title_location := :left
                         end
-                        title := Printf.@sprintf("Parameter %i",i)
+                        title := @sprintf("Parameter %i",i)
                     end
                     xformatter --> ((i == n) ? :auto : (x -> ""))
                     yformatter --> ((j == 1) ? :auto : (y -> ""))
