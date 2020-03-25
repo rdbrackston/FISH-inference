@@ -1,9 +1,9 @@
 # Main module file for work on modelling bursty transcription and extrinsic noise
 
-module TxModels
+module TranscriptionModels
 
 using Distributions, CSV, DataFrames, Plots, Optim, DifferentialEquations
-import LinearAlgebra, GSL, Base.Threads, Random, Future, SparseArrays, SpecialFunctions, DelimitedFiles
+import GSL, Base.Threads, Random, Future, SparseArrays, SpecialFunctions, DelimitedFiles
 import KernelDensity; const KDE = KernelDensity
 import LinearAlgebra; const LinAlg = LinearAlgebra
 import Combinatorics: stirlings1

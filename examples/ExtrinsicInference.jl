@@ -1,6 +1,6 @@
 # Examples for inferring extrinsic distributions
 
-using TxModels
+using TranscriptionModels; const TxModels = TranscriptionModels
 using Distributions, Plots
 import Printf: @sprintf
 gr()
