@@ -2,12 +2,12 @@
 Julia module to model bursty transcription with and without extrinsic noise. The
 package consists of a set of methods providing the following features:
 
--- Evaluation of the discrete steady state probability distributions arising from bursty transcription.
--- Evaluation of these distributions in the presence of extrinsic (parametric)
+- Evaluation of the discrete steady state probability distributions arising from bursty transcription.
+- Evaluation of these distributions in the presence of extrinsic (parametric)
 noise [1].
--- Implementation of the above via analytic solutions, the steady state finite state projection algorithm and a recurrence method [2].
--- Bayesian parameter inference for such models using an MCMC sampling scheme.
--- Inference of extrinsic distributions via a moment-based method.
+- Implementation of the above via analytic solutions, the steady state finite state projection algorithm and a recurrence method [2].
+- Bayesian parameter inference for such models using an MCMC sampling scheme.
+- Inference of extrinsic distributions via a moment-based method.
 
 ## Installation
 To use the module, first clone this respository,
